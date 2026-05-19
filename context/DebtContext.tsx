@@ -61,6 +61,24 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       },
       ...prev,
     ]);
+    // Auto-create an Individual entry if one doesn't already exist for this person.
+    setIndividuals(prev => {
+      const exists = prev.some(
+        ind => ind.name === debt.person || ind.phoneOrUsername === debt.person
+      );
+      if (exists) return prev;
+      return [
+        {
+          id: Math.random().toString(36).slice(2),
+          name: debt.person,
+          nickname: "",
+          phoneOrUsername: "",
+          notes: "",
+          createdAt: new Date().toISOString(),
+        },
+        ...prev,
+      ];
+    });
   }
 
   function addIndividual(individual: Omit<Individual, "id" | "createdAt">) {

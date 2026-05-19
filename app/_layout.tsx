@@ -20,6 +20,8 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
           <Stack.Screen name="add-debt" options={{ title: 'Add New Debt' }} />
+          <Stack.Screen name="add-individual" options={{ title: 'Add Individual' }} />
+          <Stack.Screen name="create-group" options={{ title: 'Create Group' }} />
         </Stack>
         <StatusBar style="auto" />
       </ThemeProvider>

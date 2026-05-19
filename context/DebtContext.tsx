@@ -7,6 +7,7 @@ export type Debt = {
   amount: number;
   direction: "them" | "me";
   reason: string;
+  status: "pending" | "accepted" | "rejected" | "paid" | "disputed";
   createdAt: string;
   groupId?: string;
 };
@@ -36,7 +37,7 @@ export type Individual = {
 
 type DebtContextType = {
   debts: Debt[];
-  addDebt: (debt: Omit<Debt, "id" | "createdAt">) => void;
+  addDebt: (debt: Omit<Debt, "id" | "createdAt" | "status"> & { status?: Debt["status"] }) => void;
   individuals: Individual[];
   addIndividual: (individual: Omit<Individual, "id" | "createdAt">) => void;
   groups: Group[];
@@ -50,10 +51,11 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   const [individuals, setIndividuals] = useState<Individual[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
 
-  function addDebt(debt: Omit<Debt, "id" | "createdAt">) {
+  function addDebt(debt: Omit<Debt, "id" | "createdAt" | "status"> & { status?: Debt["status"] }) {
     setDebts(prev => [
       {
         ...debt,
+        status: debt.status ?? "pending",
         id: Math.random().toString(36).slice(2),
         createdAt: new Date().toISOString(),
       },

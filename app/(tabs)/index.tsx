@@ -16,26 +16,26 @@ export default function HomeScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Debt Tracker</Text>
+      <Text style={styles.title}>Dashboard</Text>
       <Text style={styles.subtitle}>Your personal debt dashboard</Text>
 
       <View style={styles.card}>
-        <Text style={styles.cardLabel}>You owe</Text>
+        <Text style={styles.cardLabel}>You Owe</Text>
         <Text style={styles.cardValue}>${youOwe.toFixed(2)}</Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardLabel}>Owed to you</Text>
+        <Text style={styles.cardLabel}>Owed to You</Text>
         <Text style={styles.cardValue}>${owedToYou.toFixed(2)}</Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardLabel}>Total paid</Text>
+        <Text style={styles.cardLabel}>Total Paid</Text>
         <Text style={styles.cardValue}>$0.00</Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardLabel}>Total received</Text>
+        <Text style={styles.cardLabel}>Total Received</Text>
         <Text style={styles.cardValue}>$0.00</Text>
       </View>
 

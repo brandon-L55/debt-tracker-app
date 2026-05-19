@@ -22,6 +22,8 @@ export default function RootLayout() {
           <Stack.Screen name="add-debt" options={{ title: 'Add New Debt' }} />
           <Stack.Screen name="add-individual" options={{ title: 'Add Individual' }} />
           <Stack.Screen name="create-group" options={{ title: 'Create Group' }} />
+          <Stack.Screen name="group/[id]" options={{ title: '' }} />
+          <Stack.Screen name="add-group-debt" options={{ title: 'Add Group Debt' }} />
         </Stack>
         <StatusBar style="auto" />
       </ThemeProvider>

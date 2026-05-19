@@ -24,6 +24,7 @@ export type Group = {
   name: string;
   description: string;
   members: GroupMember[];
+  imageUri?: string;
   createdAt: string;
 };
 
@@ -33,6 +34,7 @@ export type Individual = {
   nickname: string;
   phoneOrUsername: string;
   notes: string;
+  imageUri?: string;
   createdAt: string;
 };
 
@@ -47,8 +49,10 @@ type DebtContextType = {
   addDebt: (debt: Omit<Debt, "id" | "createdAt" | "status"> & { status?: Debt["status"] }) => void;
   individuals: Individual[];
   addIndividual: (individual: Omit<Individual, "id" | "createdAt">) => void;
+  updateIndividual: (id: string, updates: Partial<Omit<Individual, "id" | "createdAt">>) => void;
   groups: Group[];
   addGroup: (group: Omit<Group, "id" | "createdAt">) => void;
+  updateGroup: (id: string, updates: Partial<Omit<Group, "id" | "createdAt">>) => void;
   isLoading: boolean;
 };
 
@@ -85,19 +89,16 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     load();
   }, []);
 
-  // Persist debts whenever they change (skip during initial load)
   useEffect(() => {
     if (isLoading) return;
     AsyncStorage.setItem(KEYS.debts, JSON.stringify(debts)).catch(console.error);
   }, [debts, isLoading]);
 
-  // Persist individuals whenever they change
   useEffect(() => {
     if (isLoading) return;
     AsyncStorage.setItem(KEYS.individuals, JSON.stringify(individuals)).catch(console.error);
   }, [individuals, isLoading]);
 
-  // Persist groups whenever they change
   useEffect(() => {
     if (isLoading) return;
     AsyncStorage.setItem(KEYS.groups, JSON.stringify(groups)).catch(console.error);
@@ -105,29 +106,16 @@ export function DebtProvider({ children }: { children: ReactNode }) {
 
   function addDebt(debt: Omit<Debt, "id" | "createdAt" | "status"> & { status?: Debt["status"] }) {
     setDebts(prev => [
-      {
-        ...debt,
-        status: debt.status ?? "pending",
-        id: uid(),
-        createdAt: new Date().toISOString(),
-      },
+      { ...debt, status: debt.status ?? "pending", id: uid(), createdAt: new Date().toISOString() },
       ...prev,
     ]);
-    // Auto-create an Individual entry if one doesn't already exist for this person.
     setIndividuals(prev => {
       const exists = prev.some(
         ind => ind.name === debt.person || ind.phoneOrUsername === debt.person
       );
       if (exists) return prev;
       return [
-        {
-          id: uid(),
-          name: debt.person,
-          nickname: "",
-          phoneOrUsername: "",
-          notes: "",
-          createdAt: new Date().toISOString(),
-        },
+        { id: uid(), name: debt.person, nickname: "", phoneOrUsername: "", notes: "", createdAt: new Date().toISOString() },
         ...prev,
       ];
     });
@@ -140,6 +128,23 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     ]);
   }
 
+  function updateIndividual(id: string, updates: Partial<Omit<Individual, "id" | "createdAt">>) {
+    // When name changes, repoint existing debts so transaction history stays intact.
+    if (updates.name !== undefined) {
+      const existing = individuals.find(ind => ind.id === id);
+      if (existing && updates.name !== existing.name) {
+        const oldName = existing.name;
+        const newName = updates.name;
+        setDebts(prev =>
+          prev.map(d => d.person === oldName ? { ...d, person: newName } : d)
+        );
+      }
+    }
+    setIndividuals(prev =>
+      prev.map(ind => ind.id === id ? { ...ind, ...updates } : ind)
+    );
+  }
+
   function addGroup(group: Omit<Group, "id" | "createdAt">) {
     setGroups(prev => [
       { ...group, id: uid(), createdAt: new Date().toISOString() },
@@ -147,8 +152,37 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     ]);
   }
 
+  function updateGroup(id: string, updates: Partial<Omit<Group, "id" | "createdAt">>) {
+    // When a member's name changes, repoint group debts so transaction history stays intact.
+    if (updates.members !== undefined) {
+      const existing = groups.find(g => g.id === id);
+      if (existing) {
+        for (const oldMember of existing.members) {
+          const newMember = updates.members.find(m => m.id === oldMember.id);
+          if (newMember && newMember.name !== oldMember.name) {
+            const oldName = oldMember.name;
+            const newName = newMember.name;
+            setDebts(prev =>
+              prev.map(d =>
+                d.person === oldName && d.groupId === id ? { ...d, person: newName } : d
+              )
+            );
+          }
+        }
+      }
+    }
+    setGroups(prev =>
+      prev.map(g => g.id === id ? { ...g, ...updates } : g)
+    );
+  }
+
   return (
-    <DebtContext.Provider value={{ debts, addDebt, individuals, addIndividual, groups, addGroup, isLoading }}>
+    <DebtContext.Provider value={{
+      debts, addDebt,
+      individuals, addIndividual, updateIndividual,
+      groups, addGroup, updateGroup,
+      isLoading,
+    }}>
       {children}
     </DebtContext.Provider>
   );

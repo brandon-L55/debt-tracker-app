@@ -42,6 +42,8 @@ function AppShell() {
         <Stack.Screen name="group/[id]" options={{ title: '' }} />
         <Stack.Screen name="individual/[id]" options={{ title: '' }} />
         <Stack.Screen name="add-group-debt" options={{ title: 'Add Group Debt' }} />
+        <Stack.Screen name="edit-individual" options={{ title: 'Edit Individual' }} />
+        <Stack.Screen name="edit-group" options={{ title: 'Edit Group' }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

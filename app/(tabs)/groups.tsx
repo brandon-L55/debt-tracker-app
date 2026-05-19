@@ -1,6 +1,7 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useDebts } from "@/context/DebtContext";
+import { Avatar } from "@/components/Avatar";
 import type { Group } from "@/context/DebtContext";
 
 function groupTotal(groupId: string, debts: ReturnType<typeof useDebts>["debts"]): number {
@@ -19,15 +20,14 @@ function GroupCard({ group, debts }: { group: Group; debts: ReturnType<typeof us
 
   return (
     <Pressable style={styles.card} onPress={() => router.push(`/group/${group.id}` as any)}>
-      <View style={styles.cardHeader}>
-        <View style={styles.cardTitleBlock}>
+      <View style={styles.cardInner}>
+        <Avatar name={group.name} imageUri={group.imageUri} size={44} />
+        <View style={styles.cardText}>
           <Text style={styles.cardName}>{group.name}</Text>
           <Text style={styles.cardMeta}>
             {group.members.length} {group.members.length === 1 ? "member" : "members"}
           </Text>
-          {group.description ? (
-            <Text style={styles.cardDescription}>{group.description}</Text>
-          ) : null}
+          {group.description ? <Text style={styles.cardDescription}>{group.description}</Text> : null}
         </View>
         <View style={styles.cardRight}>
           <Text style={[styles.cardTotal, { color: totalColor }]}>{totalLabel}</Text>
@@ -71,29 +71,18 @@ const styles = StyleSheet.create({
   content: { padding: 24, paddingBottom: 48 },
   title: { fontSize: 32, fontWeight: "700", marginTop: 60, color: "#111827" },
   subtitle: { fontSize: 16, color: "#6B7280", marginTop: 8, marginBottom: 24 },
-  button: {
-    backgroundColor: "#2563EB",
-    padding: 18,
-    borderRadius: 16,
-    alignItems: "center",
-  },
+  button: { backgroundColor: "#2563EB", padding: 18, borderRadius: 16, alignItems: "center" },
   buttonText: { color: "#FFFFFF", fontSize: 17, fontWeight: "700" },
   empty: { marginTop: 48, alignItems: "center" },
   emptyText: { fontSize: 16, color: "#9CA3AF" },
   list: { marginTop: 28, gap: 12 },
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
-  cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  cardTitleBlock: { flex: 1 },
-  cardName: { fontSize: 17, fontWeight: "700", color: "#111827" },
-  cardMeta: { fontSize: 13, color: "#6B7280", marginTop: 2 },
-  cardDescription: { fontSize: 13, color: "#9CA3AF", marginTop: 4 },
+  card: { backgroundColor: "#FFFFFF", borderRadius: 16, padding: 16, borderWidth: 1, borderColor: "#E2E8F0" },
+  cardInner: { flexDirection: "row", alignItems: "center", gap: 12 },
+  cardText: { flex: 1 },
+  cardName: { fontSize: 16, fontWeight: "700", color: "#111827" },
+  cardMeta: { fontSize: 13, color: "#6B7280", marginTop: 1 },
+  cardDescription: { fontSize: 12, color: "#9CA3AF", marginTop: 2 },
   cardRight: { alignItems: "flex-end", gap: 2 },
-  cardTotal: { fontSize: 16, fontWeight: "700" },
-  chevron: { fontSize: 22, color: "#CBD5E1", marginTop: 2 },
+  cardTotal: { fontSize: 15, fontWeight: "700" },
+  chevron: { fontSize: 20, color: "#CBD5E1" },
 });

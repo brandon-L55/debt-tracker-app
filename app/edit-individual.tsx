@@ -10,18 +10,31 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useDebts } from "@/context/DebtContext";
 import { Avatar } from "@/components/Avatar";
 
-export default function AddIndividualScreen() {
+export default function EditIndividualScreen() {
   const router = useRouter();
-  const { addIndividual } = useDebts();
-  const [name, setName] = useState("");
-  const [nickname, setNickname] = useState("");
-  const [phoneOrUsername, setPhoneOrUsername] = useState("");
-  const [notes, setNotes] = useState("");
-  const [imageUri, setImageUri] = useState("");
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { individuals, updateIndividual } = useDebts();
+
+  const resolvedId = Array.isArray(id) ? id[0] : id;
+  const person = individuals.find(ind => ind.id === resolvedId);
+
+  const [name, setName] = useState(person?.name ?? "");
+  const [nickname, setNickname] = useState(person?.nickname ?? "");
+  const [phoneOrUsername, setPhoneOrUsername] = useState(person?.phoneOrUsername ?? "");
+  const [notes, setNotes] = useState(person?.notes ?? "");
+  const [imageUri, setImageUri] = useState(person?.imageUri ?? "");
+
+  if (!person) {
+    return (
+      <View style={styles.notFound}>
+        <Text style={styles.notFoundText}>Person not found.</Text>
+      </View>
+    );
+  }
 
   async function pickImage() {
     const { granted } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -42,14 +55,10 @@ export default function AddIndividualScreen() {
 
   function handleSave() {
     if (!name.trim()) {
-      Alert.alert("Missing field", "Please enter a name.");
+      Alert.alert("Missing field", "Name is required.");
       return;
     }
-    if (!phoneOrUsername.trim()) {
-      Alert.alert("Missing field", "Please enter a phone number or username.");
-      return;
-    }
-    addIndividual({
+    updateIndividual(resolvedId, {
       name: name.trim(),
       nickname: nickname.trim(),
       phoneOrUsername: phoneOrUsername.trim(),
@@ -61,18 +70,15 @@ export default function AddIndividualScreen() {
 
   return (
     <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
-      <Text style={styles.title}>Add Individual</Text>
-      <Text style={styles.subtitle}>Add someone you share debts with.</Text>
-
       {/* Avatar picker */}
       <View style={styles.avatarSection}>
         {imageUri ? (
           <Image source={{ uri: imageUri }} style={styles.avatarImage} />
         ) : (
-          <Avatar name={name || "?"} size={88} />
+          <Avatar name={name || person.name} size={88} />
         )}
-        <Pressable style={styles.addPhotoButton} onPress={pickImage}>
-          <Text style={styles.addPhotoText}>{imageUri ? "Change Photo" : "Add Photo"}</Text>
+        <Pressable style={styles.changePhotoButton} onPress={pickImage}>
+          <Text style={styles.changePhotoText}>Change Photo</Text>
         </Pressable>
         {imageUri ? (
           <Pressable onPress={() => setImageUri("")}>
@@ -83,49 +89,38 @@ export default function AddIndividualScreen() {
 
       <View style={styles.formGroup}>
         <Text style={styles.label}>Name *</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Full name"
-          value={name}
-          onChangeText={setName}
-        />
+        <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Full name" />
       </View>
 
       <View style={styles.formGroup}>
         <Text style={styles.label}>Nickname</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="What do you call them?"
-          value={nickname}
-          onChangeText={setNickname}
-        />
+        <TextInput style={styles.input} value={nickname} onChangeText={setNickname} placeholder="What do you call them?" />
       </View>
 
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Phone number or username *</Text>
+        <Text style={styles.label}>Phone or username</Text>
         <TextInput
           style={styles.input}
-          placeholder="+1 555-000-0000 or @username"
           value={phoneOrUsername}
           onChangeText={setPhoneOrUsername}
-          keyboardType="default"
+          placeholder="+1 555-000-0000 or @username"
           autoCapitalize="none"
         />
       </View>
 
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Notes (optional)</Text>
+        <Text style={styles.label}>Notes</Text>
         <TextInput
           style={[styles.input, styles.textArea]}
-          placeholder="Any notes about this person..."
-          multiline
           value={notes}
           onChangeText={setNotes}
+          placeholder="Any notes about this person..."
+          multiline
         />
       </View>
 
       <Pressable style={styles.saveButton} onPress={handleSave}>
-        <Text style={styles.saveButtonText}>Save Individual</Text>
+        <Text style={styles.saveButtonText}>Save Changes</Text>
       </Pressable>
     </ScrollView>
   );
@@ -133,11 +128,11 @@ export default function AddIndividualScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: "#F8FAFC" },
-  title: { fontSize: 32, fontWeight: "700", marginTop: 40, color: "#0F172A" },
-  subtitle: { fontSize: 16, color: "#64748B", marginBottom: 4 },
+  notFound: { flex: 1, justifyContent: "center", alignItems: "center" },
+  notFoundText: { fontSize: 16, color: "#9CA3AF" },
   avatarSection: { alignItems: "center", paddingVertical: 28, gap: 10 },
   avatarImage: { width: 88, height: 88, borderRadius: 44 },
-  addPhotoButton: {
+  changePhotoButton: {
     backgroundColor: "#EFF6FF",
     borderWidth: 1,
     borderColor: "#BFDBFE",
@@ -145,7 +140,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
-  addPhotoText: { color: "#2563EB", fontSize: 14, fontWeight: "600" },
+  changePhotoText: { color: "#2563EB", fontSize: 14, fontWeight: "600" },
   removePhotoText: { color: "#9CA3AF", fontSize: 13 },
   formGroup: { marginBottom: 22 },
   label: { fontSize: 16, fontWeight: "700", color: "#0F172A", marginBottom: 8 },

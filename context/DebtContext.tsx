@@ -11,6 +11,7 @@ export type Debt = {
   status: "pending" | "accepted" | "rejected" | "paid" | "disputed";
   createdAt: string;
   groupId?: string;
+  deadline?: string | null;
 };
 
 export type GroupMember = {
@@ -42,6 +43,8 @@ const KEYS = {
   debts: "@debt_tracker/debts",
   individuals: "@debt_tracker/individuals",
   groups: "@debt_tracker/groups",
+  individualOrder: "@debt_tracker/individual_order",
+  groupOrder: "@debt_tracker/group_order",
 } as const;
 
 type DebtContextType = {
@@ -53,6 +56,11 @@ type DebtContextType = {
   groups: Group[];
   addGroup: (group: Omit<Group, "id" | "createdAt">) => void;
   updateGroup: (id: string, updates: Partial<Omit<Group, "id" | "createdAt">>) => void;
+  individualOrder: string[];
+  setIndividualOrder: (order: string[]) => void;
+  groupOrder: string[];
+  setGroupOrder: (order: string[]) => void;
+  reset: () => void;
   isLoading: boolean;
 };
 
@@ -66,20 +74,25 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   const [debts, setDebts] = useState<Debt[]>([]);
   const [individuals, setIndividuals] = useState<Individual[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [individualOrder, setIndividualOrder] = useState<string[]>([]);
+  const [groupOrder, setGroupOrder] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Hydrate from storage on mount
   useEffect(() => {
     async function load() {
       try {
-        const [debtsJson, individualsJson, groupsJson] = await Promise.all([
+        const [debtsJson, individualsJson, groupsJson, indOrderJson, grpOrderJson] = await Promise.all([
           AsyncStorage.getItem(KEYS.debts),
           AsyncStorage.getItem(KEYS.individuals),
           AsyncStorage.getItem(KEYS.groups),
+          AsyncStorage.getItem(KEYS.individualOrder),
+          AsyncStorage.getItem(KEYS.groupOrder),
         ]);
         if (debtsJson) setDebts(JSON.parse(debtsJson));
         if (individualsJson) setIndividuals(JSON.parse(individualsJson));
         if (groupsJson) setGroups(JSON.parse(groupsJson));
+        if (indOrderJson) setIndividualOrder(JSON.parse(indOrderJson));
+        if (grpOrderJson) setGroupOrder(JSON.parse(grpOrderJson));
       } catch (e) {
         console.error("Failed to load stored data:", e);
       } finally {
@@ -104,11 +117,23 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     AsyncStorage.setItem(KEYS.groups, JSON.stringify(groups)).catch(console.error);
   }, [groups, isLoading]);
 
+  useEffect(() => {
+    if (isLoading) return;
+    AsyncStorage.setItem(KEYS.individualOrder, JSON.stringify(individualOrder)).catch(console.error);
+  }, [individualOrder, isLoading]);
+
+  useEffect(() => {
+    if (isLoading) return;
+    AsyncStorage.setItem(KEYS.groupOrder, JSON.stringify(groupOrder)).catch(console.error);
+  }, [groupOrder, isLoading]);
+
   function addDebt(debt: Omit<Debt, "id" | "createdAt" | "status"> & { status?: Debt["status"] }) {
     setDebts(prev => [
       { ...debt, status: debt.status ?? "pending", id: uid(), createdAt: new Date().toISOString() },
       ...prev,
     ]);
+    // Auto-create individual if they don't already exist.
+    // Their ID is appended to individualOrder via reconciliation in the Individuals tab.
     setIndividuals(prev => {
       const exists = prev.some(
         ind => ind.name === debt.person || ind.phoneOrUsername === debt.person
@@ -122,14 +147,15 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   }
 
   function addIndividual(individual: Omit<Individual, "id" | "createdAt">) {
+    const newId = uid();
     setIndividuals(prev => [
-      { ...individual, id: uid(), createdAt: new Date().toISOString() },
+      { ...individual, id: newId, createdAt: new Date().toISOString() },
       ...prev,
     ]);
+    setIndividualOrder(prev => [...prev, newId]);
   }
 
   function updateIndividual(id: string, updates: Partial<Omit<Individual, "id" | "createdAt">>) {
-    // When name changes, repoint existing debts so transaction history stays intact.
     if (updates.name !== undefined) {
       const existing = individuals.find(ind => ind.id === id);
       if (existing && updates.name !== existing.name) {
@@ -146,19 +172,28 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   }
 
   function addGroup(group: Omit<Group, "id" | "createdAt">) {
+    const newId = uid();
     setGroups(prev => [
-      { ...group, id: uid(), createdAt: new Date().toISOString() },
+      { ...group, id: newId, createdAt: new Date().toISOString() },
       ...prev,
     ]);
+    setGroupOrder(prev => [...prev, newId]);
+  }
+
+  function reset() {
+    setDebts([]);
+    setIndividuals([]);
+    setGroups([]);
+    setIndividualOrder([]);
+    setGroupOrder([]);
   }
 
   function updateGroup(id: string, updates: Partial<Omit<Group, "id" | "createdAt">>) {
-    // When a member's name changes, repoint group debts so transaction history stays intact.
     if (updates.members !== undefined) {
       const existing = groups.find(g => g.id === id);
       if (existing) {
         for (const oldMember of existing.members) {
-          const newMember = updates.members.find(m => m.id === oldMember.id);
+          const newMember = updates.members!.find(m => m.id === oldMember.id);
           if (newMember && newMember.name !== oldMember.name) {
             const oldName = oldMember.name;
             const newName = newMember.name;
@@ -181,6 +216,9 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       debts, addDebt,
       individuals, addIndividual, updateIndividual,
       groups, addGroup, updateGroup,
+      individualOrder, setIndividualOrder,
+      groupOrder, setGroupOrder,
+      reset,
       isLoading,
     }}>
       {children}

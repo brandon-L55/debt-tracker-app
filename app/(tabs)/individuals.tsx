@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useRouter } from "expo-router";
 // @ts-ignore — forwardRef deprecation hint from React 19; library still works correctly
 import DraggableFlatList, { ScaleDecorator } from "react-native-draggable-flatlist";
@@ -9,7 +9,8 @@ import { useTheme } from "@/context/ThemeContext";
 import { Avatar } from "@/components/Avatar";
 import type { Individual, Debt } from "@/context/DebtContext";
 
-type SortOption = "az" | "za" | "date" | "balance-high" | "balance-low" | "manual";
+// "custom" = post-drag order; not shown in the sort menu
+type SortOption = "az" | "za" | "date" | "balance-high" | "balance-low" | "custom";
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "az", label: "Alphabetical" },
@@ -17,7 +18,6 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "date", label: "Date Added" },
   { value: "balance-high", label: "Balance: Highest First" },
   { value: "balance-low", label: "Balance: Lowest First" },
-  { value: "manual", label: "Manual Order" },
 ];
 
 function calcNetBalance(name: string, debts: Debt[]): number {
@@ -49,7 +49,7 @@ export default function IndividualsScreen() {
   const displayItems = useMemo(() => {
     const q = search.toLowerCase().trim();
 
-    if (sort === "manual") {
+    if (sort === "custom") {
       const items = reconciledOrder
         .map(id => individuals.find(i => i.id === id))
         .filter((x): x is Individual => !!x);
@@ -90,7 +90,7 @@ export default function IndividualsScreen() {
 
     return (
       <ScaleDecorator activeScale={1.02}>
-        <Pressable
+        <TouchableOpacity
           style={[
             styles.card,
             { backgroundColor: isActive ? t.primarySoft : t.card, borderColor: isActive ? t.primaryBorder : t.border },
@@ -98,6 +98,8 @@ export default function IndividualsScreen() {
           onPress={() => router.push(`/individual/${item.id}` as any)}
           onLongPress={drag}
           delayLongPress={250}
+          activeOpacity={0.85}
+          disabled={isActive}
         >
           <View style={styles.cardInner}>
             <View style={styles.dragHandle}>
@@ -114,7 +116,7 @@ export default function IndividualsScreen() {
               <Text style={[styles.balanceText, { color: balanceColor }]}>{balanceLabel}</Text>
             </View>
           </View>
-        </Pressable>
+        </TouchableOpacity>
       </ScaleDecorator>
     );
   }, [debts, router, t]);
@@ -138,15 +140,15 @@ export default function IndividualsScreen() {
         />
         <Pressable
           style={[styles.sortBtn, {
-            backgroundColor: sort !== "date" ? t.primarySoft : t.card,
-            borderColor: sort !== "date" ? t.primaryBorder : t.border,
+            backgroundColor: (sort !== "date" && sort !== "custom") ? t.primarySoft : t.card,
+            borderColor: (sort !== "date" && sort !== "custom") ? t.primaryBorder : t.border,
           }]}
           onPress={() => setShowSortMenu(true)}
         >
-          <Text style={[styles.sortBtnIcon, { color: sort !== "date" ? t.primary : t.text }]}>⇅</Text>
+          <Text style={[styles.sortBtnIcon, { color: (sort !== "date" && sort !== "custom") ? t.primary : t.text }]}>⇅</Text>
         </Pressable>
       </View>
-      {sort !== "date" && <Text style={[styles.sortHint, { color: t.textSub }]}>Sorted by: {activeSortLabel}</Text>}
+      {(sort !== "date" && sort !== "custom") && <Text style={[styles.sortHint, { color: t.textSub }]}>Sorted by: {activeSortLabel}</Text>}
       <Text style={[styles.dragHint, { color: t.textMuted }]}>Long-press any card to drag and reorder</Text>
     </View>
   );
@@ -166,7 +168,7 @@ export default function IndividualsScreen() {
           } else {
             setIndividualOrder(newOrder);
           }
-          setSort("manual");
+          setSort("custom");
         }}
         ListHeaderComponent={listHeader}
         ListEmptyComponent={

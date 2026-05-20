@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useRouter } from "expo-router";
 // @ts-ignore — forwardRef deprecation hint from React 19; library still works correctly
 import DraggableFlatList, { ScaleDecorator } from "react-native-draggable-flatlist";
@@ -9,7 +9,8 @@ import { useTheme } from "@/context/ThemeContext";
 import { Avatar } from "@/components/Avatar";
 import type { Group, Debt } from "@/context/DebtContext";
 
-type SortOption = "az" | "za" | "date" | "amount-high" | "amount-low" | "members" | "manual";
+// "custom" = post-drag order; not shown in the sort menu
+type SortOption = "az" | "za" | "date" | "amount-high" | "amount-low" | "members" | "custom";
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "az", label: "Alphabetical" },
@@ -18,7 +19,6 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "amount-high", label: "Amount Owed: Highest First" },
   { value: "amount-low", label: "Amount Owed: Lowest First" },
   { value: "members", label: "Member Count" },
-  { value: "manual", label: "Manual Order" },
 ];
 
 function calcGroupTotal(groupId: string, debts: Debt[]): number {
@@ -50,7 +50,7 @@ export default function GroupsScreen() {
   const displayItems = useMemo(() => {
     const q = search.toLowerCase().trim();
 
-    if (sort === "manual") {
+    if (sort === "custom") {
       const items = reconciledOrder
         .map(id => groups.find(g => g.id === id))
         .filter((x): x is Group => !!x);
@@ -90,7 +90,7 @@ export default function GroupsScreen() {
 
     return (
       <ScaleDecorator activeScale={1.02}>
-        <Pressable
+        <TouchableOpacity
           style={[
             styles.card,
             { backgroundColor: isActive ? t.primarySoft : t.card, borderColor: isActive ? t.primaryBorder : t.border },
@@ -98,6 +98,8 @@ export default function GroupsScreen() {
           onPress={() => router.push(`/group/${item.id}` as any)}
           onLongPress={drag}
           delayLongPress={250}
+          activeOpacity={0.85}
+          disabled={isActive}
         >
           <View style={styles.cardInner}>
             <View style={styles.dragHandle}>
@@ -116,7 +118,7 @@ export default function GroupsScreen() {
               <Text style={[styles.chevron, { color: t.border }]}>›</Text>
             </View>
           </View>
-        </Pressable>
+        </TouchableOpacity>
       </ScaleDecorator>
     );
   }, [debts, router, t]);
@@ -140,15 +142,15 @@ export default function GroupsScreen() {
         />
         <Pressable
           style={[styles.sortBtn, {
-            backgroundColor: sort !== "date" ? t.primarySoft : t.card,
-            borderColor: sort !== "date" ? t.primaryBorder : t.border,
+            backgroundColor: (sort !== "date" && sort !== "custom") ? t.primarySoft : t.card,
+            borderColor: (sort !== "date" && sort !== "custom") ? t.primaryBorder : t.border,
           }]}
           onPress={() => setShowSortMenu(true)}
         >
-          <Text style={[styles.sortBtnIcon, { color: sort !== "date" ? t.primary : t.text }]}>⇅</Text>
+          <Text style={[styles.sortBtnIcon, { color: (sort !== "date" && sort !== "custom") ? t.primary : t.text }]}>⇅</Text>
         </Pressable>
       </View>
-      {sort !== "date" && <Text style={[styles.sortHint, { color: t.textSub }]}>Sorted by: {activeSortLabel}</Text>}
+      {(sort !== "date" && sort !== "custom") && <Text style={[styles.sortHint, { color: t.textSub }]}>Sorted by: {activeSortLabel}</Text>}
       <Text style={[styles.dragHint, { color: t.textMuted }]}>Long-press any card to drag and reorder</Text>
     </View>
   );
@@ -168,7 +170,7 @@ export default function GroupsScreen() {
           } else {
             setGroupOrder(newOrder);
           }
-          setSort("manual");
+          setSort("custom");
         }}
         ListHeaderComponent={listHeader}
         ListEmptyComponent={

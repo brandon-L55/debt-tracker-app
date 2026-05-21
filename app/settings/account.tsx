@@ -4,11 +4,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "@/context/ThemeContext";
 import { useDebts } from "@/context/DebtContext";
 import { useContacts } from "@/context/ContactsContext";
+import { useGroups } from "@/context/GroupsContext";
 
 export default function AccountSettingsScreen() {
   const { colors: t } = useTheme();
-  const { debts, groups, reset } = useDebts();
+  const { debts, reset } = useDebts();
   const { individuals } = useContacts();
+  const { groups } = useGroups();
 
   async function exportData() {
     const payload = JSON.stringify({ debts, individuals, groups }, null, 2);

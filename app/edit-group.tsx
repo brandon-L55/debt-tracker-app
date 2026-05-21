@@ -11,7 +11,7 @@ import {
   View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useDebts } from "@/context/DebtContext";
+import { useGroups } from "@/context/GroupsContext";
 import { useTheme } from "@/context/ThemeContext";
 import { Avatar } from "@/components/Avatar";
 import type { GroupMember } from "@/context/DebtContext";
@@ -23,7 +23,7 @@ function uid() {
 export default function EditGroupScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { groups, updateGroup } = useDebts();
+  const { groups, updateGroup } = useGroups();
   const { colors: t } = useTheme();
 
   const resolvedId = Array.isArray(id) ? id[0] : id;

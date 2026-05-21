@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useDebts } from "@/context/DebtContext";
+import { useGroups } from "@/context/GroupsContext";
 import { useTheme } from "@/context/ThemeContext";
 import { Avatar } from "@/components/Avatar";
 import type { Debt } from "@/context/DebtContext";
@@ -73,7 +74,8 @@ function statusStyle(status: string) {
 export default function GroupDashboardScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { groups, debts } = useDebts();
+  const { debts } = useDebts();
+  const { groups } = useGroups();
   const { colors: t } = useTheme();
   const [sort, setSort] = useState<DebtSortOption>("date");
   const [showSortMenu, setShowSortMenu] = useState(false);

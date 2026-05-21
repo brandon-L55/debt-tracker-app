@@ -6,6 +6,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import DraggableFlatList, { ScaleDecorator } from "react-native-draggable-flatlist";
 import type { RenderItemParams } from "react-native-draggable-flatlist";
 import { useDebts } from "@/context/DebtContext";
+import { useGroups } from "@/context/GroupsContext";
 import { useTheme } from "@/context/ThemeContext";
 import { Avatar } from "@/components/Avatar";
 import type { Group, Debt } from "@/context/DebtContext";
@@ -35,7 +36,8 @@ function calcGroupTotal(groupId: string, debts: Debt[]): number {
 
 export default function GroupsScreen() {
   const router = useRouter();
-  const { groups, debts, groupOrder, setGroupOrder, updateGroup, deleteGroup } = useDebts();
+  const { debts } = useDebts();
+  const { groups, groupOrder, setGroupOrder, updateGroup, deleteGroup } = useGroups();
   const { colors: t } = useTheme();
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortOption>("latest-debt");

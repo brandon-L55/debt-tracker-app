@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useDebts } from "@/context/DebtContext";
+import { useGroups } from "@/context/GroupsContext";
 import { useTheme } from "@/context/ThemeContext";
 
 function parseDeadlineInput(input: string): string | null {
@@ -26,7 +27,8 @@ function previewDeadline(input: string): string | null {
 export default function AddGroupDebtScreen() {
   const router = useRouter();
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
-  const { groups, addDebt } = useDebts();
+  const { addDebt } = useDebts();
+  const { groups } = useGroups();
   const { colors: t } = useTheme();
 
   const resolvedGroupId = Array.isArray(groupId) ? groupId[0] : groupId;

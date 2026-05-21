@@ -9,18 +9,19 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { useDebts } from "@/context/DebtContext";
+import { useGroups } from "@/context/GroupsContext";
 import { useTheme } from "@/context/ThemeContext";
 import type { GroupMember } from "@/context/DebtContext";
 
 export default function CreateGroupScreen() {
   const router = useRouter();
-  const { addGroup } = useDebts();
+  const { addGroup } = useGroups();
   const { colors: t } = useTheme();
 
   const [groupName, setGroupName] = useState("");
   const [description, setDescription] = useState("");
   const [members, setMembers] = useState<GroupMember[]>([]);
+  const [saving, setSaving] = useState(false);
 
   const [memberName, setMemberName] = useState("");
   const [memberContact, setMemberContact] = useState("");
@@ -46,17 +47,29 @@ export default function CreateGroupScreen() {
     setMembers(prev => prev.filter(m => m.id !== id));
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!groupName.trim()) {
       Alert.alert("Missing field", "Please enter a group name.");
       return;
     }
-    addGroup({
-      name: groupName.trim(),
-      description: description.trim(),
-      members,
-    });
-    router.back();
+    setSaving(true);
+    try {
+      await addGroup({
+        name: groupName.trim(),
+        description: description.trim(),
+        members,
+      });
+      router.back();
+    } catch (e: unknown) {
+      const msg =
+        e instanceof Error
+          ? e.message
+          : (e as { message?: string })?.message ?? "Could not save group.";
+      console.error("CREATE GROUP ERROR:", e);
+      Alert.alert("Save failed", msg);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -128,8 +141,8 @@ export default function CreateGroupScreen() {
         )}
       </View>
 
-      <Pressable style={[styles.saveButton, { backgroundColor: t.primary }]} onPress={handleSave}>
-        <Text style={styles.saveButtonText}>Save Group</Text>
+      <Pressable style={[styles.saveButton, { backgroundColor: t.primary, opacity: saving ? 0.6 : 1 }]} onPress={handleSave} disabled={saving}>
+        <Text style={styles.saveButtonText}>{saving ? "Saving…" : "Save Group"}</Text>
       </Pressable>
     </ScrollView>
   );

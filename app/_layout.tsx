@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { DebtProvider, useDebts } from '@/context/DebtContext';
 import { ContactsProvider, useContacts } from '@/context/ContactsContext';
+import { GroupsProvider, useGroups } from '@/context/GroupsContext';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 
@@ -21,9 +22,11 @@ export default function RootLayout() {
       <ThemeProvider>
         <AuthProvider>
           <DebtProvider>
-            {/* ContactsProvider is inside DebtProvider so it can call renameDebtPerson */}
+            {/* ContactsProvider and GroupsProvider are inside DebtProvider so they can call renameDebtPerson */}
             <ContactsProvider>
-              <AppShell />
+              <GroupsProvider>
+                <AppShell />
+              </GroupsProvider>
             </ContactsProvider>
           </DebtProvider>
         </AuthProvider>
@@ -36,10 +39,11 @@ function AppShell() {
   const { isLoading: debtsLoading } = useDebts();
   const { isLoading: authLoading } = useAuth();
   const { isLoading: contactsLoading } = useContacts();
+  const { isLoading: groupsLoading } = useGroups();
   const { isDark } = useTheme();
 
   // Wait for auth session and all data sources to resolve before rendering nav tree
-  if (authLoading || debtsLoading || contactsLoading) {
+  if (authLoading || debtsLoading || contactsLoading || groupsLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: isDark ? '#0F172A' : '#F8FAFC' }}>
         <ActivityIndicator size="large" color="#2563EB" />

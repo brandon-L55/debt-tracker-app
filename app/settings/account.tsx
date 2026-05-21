@@ -3,10 +3,12 @@ import { Share } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "@/context/ThemeContext";
 import { useDebts } from "@/context/DebtContext";
+import { useContacts } from "@/context/ContactsContext";
 
 export default function AccountSettingsScreen() {
   const { colors: t } = useTheme();
-  const { debts, individuals, groups, reset } = useDebts();
+  const { debts, groups, reset } = useDebts();
+  const { individuals } = useContacts();
 
   async function exportData() {
     const payload = JSON.stringify({ debts, individuals, groups }, null, 2);

@@ -45,27 +45,21 @@ export type Individual = {
 
 const KEYS = {
   debts: "@debt_tracker/debts",
-  individuals: "@debt_tracker/individuals",
   groups: "@debt_tracker/groups",
-  individualOrder: "@debt_tracker/individual_order",
   groupOrder: "@debt_tracker/group_order",
 } as const;
 
 type DebtContextType = {
   debts: Debt[];
   addDebt: (debt: Omit<Debt, "id" | "createdAt" | "status"> & { status?: Debt["status"] }) => void;
-  individuals: Individual[];
-  addIndividual: (individual: Omit<Individual, "id" | "createdAt">) => void;
-  updateIndividual: (id: string, updates: Partial<Omit<Individual, "id" | "createdAt">>) => void;
   groups: Group[];
   addGroup: (group: Omit<Group, "id" | "createdAt">) => void;
   updateGroup: (id: string, updates: Partial<Omit<Group, "id" | "createdAt">>) => void;
-  deleteIndividual: (id: string) => void;
   deleteGroup: (id: string) => void;
-  individualOrder: string[];
-  setIndividualOrder: (order: string[]) => void;
   groupOrder: string[];
   setGroupOrder: (order: string[]) => void;
+  /** Renames a person string inside all local debts. Called by ContactsContext when an individual's name changes. */
+  renameDebtPerson: (oldName: string, newName: string) => void;
   reset: () => void;
   isLoading: boolean;
 };
@@ -78,26 +72,20 @@ function uid() {
 
 export function DebtProvider({ children }: { children: ReactNode }) {
   const [debts, setDebts] = useState<Debt[]>([]);
-  const [individuals, setIndividuals] = useState<Individual[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
-  const [individualOrder, setIndividualOrder] = useState<string[]>([]);
   const [groupOrder, setGroupOrder] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       try {
-        const [debtsJson, individualsJson, groupsJson, indOrderJson, grpOrderJson] = await Promise.all([
+        const [debtsJson, groupsJson, grpOrderJson] = await Promise.all([
           AsyncStorage.getItem(KEYS.debts),
-          AsyncStorage.getItem(KEYS.individuals),
           AsyncStorage.getItem(KEYS.groups),
-          AsyncStorage.getItem(KEYS.individualOrder),
           AsyncStorage.getItem(KEYS.groupOrder),
         ]);
         if (debtsJson) setDebts(JSON.parse(debtsJson));
-        if (individualsJson) setIndividuals(JSON.parse(individualsJson));
         if (groupsJson) setGroups(JSON.parse(groupsJson));
-        if (indOrderJson) setIndividualOrder(JSON.parse(indOrderJson));
         if (grpOrderJson) setGroupOrder(JSON.parse(grpOrderJson));
       } catch (e) {
         console.error("Failed to load stored data:", e);
@@ -115,18 +103,8 @@ export function DebtProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (isLoading) return;
-    AsyncStorage.setItem(KEYS.individuals, JSON.stringify(individuals)).catch(console.error);
-  }, [individuals, isLoading]);
-
-  useEffect(() => {
-    if (isLoading) return;
     AsyncStorage.setItem(KEYS.groups, JSON.stringify(groups)).catch(console.error);
   }, [groups, isLoading]);
-
-  useEffect(() => {
-    if (isLoading) return;
-    AsyncStorage.setItem(KEYS.individualOrder, JSON.stringify(individualOrder)).catch(console.error);
-  }, [individualOrder, isLoading]);
 
   useEffect(() => {
     if (isLoading) return;
@@ -138,48 +116,12 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       { ...debt, status: debt.status ?? "pending", id: uid(), createdAt: new Date().toISOString() },
       ...prev,
     ]);
-    // Auto-create individual if they don't already exist.
-    // Their ID is appended to individualOrder via reconciliation in the Individuals tab.
-    setIndividuals(prev => {
-      const exists = prev.some(
-        ind => ind.name === debt.person || ind.phoneOrUsername === debt.person
-      );
-      if (exists) return prev;
-      return [
-        { id: uid(), name: debt.person, nickname: "", phoneOrUsername: "", notes: "", createdAt: new Date().toISOString() },
-        ...prev,
-      ];
-    });
   }
 
-  function addIndividual(individual: Omit<Individual, "id" | "createdAt">) {
-    const newId = uid();
-    setIndividuals(prev => [
-      { ...individual, id: newId, createdAt: new Date().toISOString() },
-      ...prev,
-    ]);
-    setIndividualOrder(prev => [...prev, newId]);
-  }
-
-  function updateIndividual(id: string, updates: Partial<Omit<Individual, "id" | "createdAt">>) {
-    if (updates.name !== undefined) {
-      const existing = individuals.find(ind => ind.id === id);
-      if (existing && updates.name !== existing.name) {
-        const oldName = existing.name;
-        const newName = updates.name;
-        setDebts(prev =>
-          prev.map(d => d.person === oldName ? { ...d, person: newName } : d)
-        );
-      }
-    }
-    setIndividuals(prev =>
-      prev.map(ind => ind.id === id ? { ...ind, ...updates } : ind)
+  function renameDebtPerson(oldName: string, newName: string) {
+    setDebts(prev =>
+      prev.map(d => d.person === oldName ? { ...d, person: newName } : d)
     );
-  }
-
-  function deleteIndividual(id: string) {
-    setIndividuals(prev => prev.filter(i => i.id !== id));
-    setIndividualOrder(prev => prev.filter(oid => oid !== id));
   }
 
   function deleteGroup(id: string) {
@@ -198,9 +140,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
 
   function reset() {
     setDebts([]);
-    setIndividuals([]);
     setGroups([]);
-    setIndividualOrder([]);
     setGroupOrder([]);
   }
 
@@ -230,10 +170,9 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   return (
     <DebtContext.Provider value={{
       debts, addDebt,
-      individuals, addIndividual, updateIndividual, deleteIndividual,
       groups, addGroup, updateGroup, deleteGroup,
-      individualOrder, setIndividualOrder,
       groupOrder, setGroupOrder,
+      renameDebtPerson,
       reset,
       isLoading,
     }}>

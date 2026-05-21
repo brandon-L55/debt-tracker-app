@@ -1,11 +1,12 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { Alert, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import { useFocusEffect, useRouter } from "expo-router";
 // @ts-ignore — forwardRef deprecation hint from React 19; library still works correctly
 import DraggableFlatList, { ScaleDecorator } from "react-native-draggable-flatlist";
 import type { RenderItemParams } from "react-native-draggable-flatlist";
 import { useDebts } from "@/context/DebtContext";
+import { useContacts } from "@/context/ContactsContext";
 import { useTheme } from "@/context/ThemeContext";
 import { Avatar } from "@/components/Avatar";
 import type { Individual, Debt } from "@/context/DebtContext";
@@ -35,7 +36,8 @@ function latestDebtDate(name: string, debts: Debt[]): number {
 
 export default function IndividualsScreen() {
   const router = useRouter();
-  const { individuals, debts, individualOrder, setIndividualOrder, updateIndividual, deleteIndividual } = useDebts();
+  const { individuals, individualOrder, setIndividualOrder, updateIndividual, deleteIndividual, isLoading: contactsLoading, contactsError } = useContacts();
+  const { debts } = useDebts();
   const { colors: t } = useTheme();
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortOption>("latest-debt");
@@ -236,6 +238,24 @@ export default function IndividualsScreen() {
       <Text style={[styles.dragHint, { color: t.textMuted }]}>Long-press any card (three lines on left) to drag and reorder</Text>
     </View>
   );
+
+  if (contactsLoading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: t.bg, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color={t.primary} />
+      </View>
+    );
+  }
+
+  if (contactsError) {
+    return (
+      <View style={{ flex: 1, backgroundColor: t.bg, justifyContent: "center", alignItems: "center", padding: 24 }}>
+        <Text style={{ color: t.red, fontSize: 15, textAlign: "center" }}>
+          Failed to load contacts.{"\n"}{contactsError}
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>

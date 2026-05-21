@@ -11,14 +11,14 @@ import {
   View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useDebts } from "@/context/DebtContext";
+import { useContacts } from "@/context/ContactsContext";
 import { useTheme } from "@/context/ThemeContext";
 import { Avatar } from "@/components/Avatar";
 
 export default function EditIndividualScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { individuals, updateIndividual } = useDebts();
+  const { individuals, updateIndividual } = useContacts();
   const { colors: t } = useTheme();
 
   const resolvedId = Array.isArray(id) ? id[0] : id;

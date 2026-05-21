@@ -11,19 +11,20 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { useDebts } from "@/context/DebtContext";
+import { useContacts } from "@/context/ContactsContext";
 import { useTheme } from "@/context/ThemeContext";
 import { Avatar } from "@/components/Avatar";
 
 export default function AddIndividualScreen() {
   const router = useRouter();
-  const { addIndividual } = useDebts();
+  const { addIndividual } = useContacts();
   const { colors: t } = useTheme();
   const [name, setName] = useState("");
   const [nickname, setNickname] = useState("");
   const [phoneOrUsername, setPhoneOrUsername] = useState("");
   const [notes, setNotes] = useState("");
   const [imageUri, setImageUri] = useState("");
+  const [saving, setSaving] = useState(false);
 
   async function pickImage() {
     const { granted } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -42,7 +43,7 @@ export default function AddIndividualScreen() {
     }
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!name.trim()) {
       Alert.alert("Missing field", "Please enter a name.");
       return;
@@ -51,14 +52,22 @@ export default function AddIndividualScreen() {
       Alert.alert("Missing field", "Please enter a phone number or username.");
       return;
     }
-    addIndividual({
-      name: name.trim(),
-      nickname: nickname.trim(),
-      phoneOrUsername: phoneOrUsername.trim(),
-      notes: notes.trim(),
-      imageUri: imageUri || undefined,
-    });
-    router.back();
+    setSaving(true);
+    try {
+      await addIndividual({
+        name: name.trim(),
+        nickname: nickname.trim(),
+        phoneOrUsername: phoneOrUsername.trim(),
+        notes: notes.trim(),
+        imageUri: imageUri || undefined,
+      });
+      router.back();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Could not save contact.";
+      Alert.alert("Save failed", msg);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -129,8 +138,8 @@ export default function AddIndividualScreen() {
         />
       </View>
 
-      <Pressable style={[styles.saveButton, { backgroundColor: t.primary }]} onPress={handleSave}>
-        <Text style={styles.saveButtonText}>Save Individual</Text>
+      <Pressable style={[styles.saveButton, { backgroundColor: t.primary, opacity: saving ? 0.6 : 1 }]} onPress={handleSave} disabled={saving}>
+        <Text style={styles.saveButtonText}>{saving ? "Saving…" : "Save Individual"}</Text>
       </Pressable>
     </ScrollView>
   );

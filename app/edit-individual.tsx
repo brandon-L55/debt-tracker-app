@@ -12,12 +12,14 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useDebts } from "@/context/DebtContext";
+import { useTheme } from "@/context/ThemeContext";
 import { Avatar } from "@/components/Avatar";
 
 export default function EditIndividualScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { individuals, updateIndividual } = useDebts();
+  const { colors: t } = useTheme();
 
   const resolvedId = Array.isArray(id) ? id[0] : id;
   const person = individuals.find(ind => ind.id === resolvedId);
@@ -30,8 +32,8 @@ export default function EditIndividualScreen() {
 
   if (!person) {
     return (
-      <View style={styles.notFound}>
-        <Text style={styles.notFoundText}>Person not found.</Text>
+      <View style={[styles.notFound, { backgroundColor: t.bg }]}>
+        <Text style={{ color: t.textMuted, fontSize: 16 }}>Person not found.</Text>
       </View>
     );
   }
@@ -69,57 +71,70 @@ export default function EditIndividualScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
-      {/* Avatar picker */}
+    <ScrollView style={[styles.container, { backgroundColor: t.bg }]} keyboardShouldPersistTaps="handled">
       <View style={styles.avatarSection}>
         {imageUri ? (
           <Image source={{ uri: imageUri }} style={styles.avatarImage} />
         ) : (
           <Avatar name={name || person.name} size={88} />
         )}
-        <Pressable style={styles.changePhotoButton} onPress={pickImage}>
-          <Text style={styles.changePhotoText}>Change Photo</Text>
+        <Pressable style={[styles.changePhotoButton, { backgroundColor: t.primarySoft, borderColor: t.primaryBorder }]} onPress={pickImage}>
+          <Text style={[styles.changePhotoText, { color: t.primary }]}>Change Photo</Text>
         </Pressable>
         {imageUri ? (
           <Pressable onPress={() => setImageUri("")}>
-            <Text style={styles.removePhotoText}>Remove Photo</Text>
+            <Text style={[styles.removePhotoText, { color: t.textMuted }]}>Remove Photo</Text>
           </Pressable>
         ) : null}
       </View>
 
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Name *</Text>
-        <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Full name" />
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Nickname</Text>
-        <TextInput style={styles.input} value={nickname} onChangeText={setNickname} placeholder="What do you call them?" />
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Phone or username</Text>
+        <Text style={[styles.label, { color: t.text }]}>Name *</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
+          placeholder="Full name"
+          placeholderTextColor={t.textMuted}
+          value={name}
+          onChangeText={setName}
+        />
+      </View>
+
+      <View style={styles.formGroup}>
+        <Text style={[styles.label, { color: t.text }]}>Nickname</Text>
+        <TextInput
+          style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
+          placeholder="What do you call them?"
+          placeholderTextColor={t.textMuted}
+          value={nickname}
+          onChangeText={setNickname}
+        />
+      </View>
+
+      <View style={styles.formGroup}>
+        <Text style={[styles.label, { color: t.text }]}>Phone or username</Text>
+        <TextInput
+          style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
+          placeholder="+1 555-000-0000 or @username"
+          placeholderTextColor={t.textMuted}
           value={phoneOrUsername}
           onChangeText={setPhoneOrUsername}
-          placeholder="+1 555-000-0000 or @username"
           autoCapitalize="none"
         />
       </View>
 
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Notes</Text>
+        <Text style={[styles.label, { color: t.text }]}>Notes</Text>
         <TextInput
-          style={[styles.input, styles.textArea]}
+          style={[styles.input, styles.textArea, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
+          placeholder="Any notes about this person..."
+          placeholderTextColor={t.textMuted}
           value={notes}
           onChangeText={setNotes}
-          placeholder="Any notes about this person..."
           multiline
         />
       </View>
 
-      <Pressable style={styles.saveButton} onPress={handleSave}>
+      <Pressable style={[styles.saveButton, { backgroundColor: t.primary }]} onPress={handleSave}>
         <Text style={styles.saveButtonText}>Save Changes</Text>
       </Pressable>
     </ScrollView>
@@ -127,39 +142,17 @@ export default function EditIndividualScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: "#F8FAFC" },
+  container: { flex: 1, padding: 20 },
   notFound: { flex: 1, justifyContent: "center", alignItems: "center" },
-  notFoundText: { fontSize: 16, color: "#9CA3AF" },
   avatarSection: { alignItems: "center", paddingVertical: 28, gap: 10 },
   avatarImage: { width: 88, height: 88, borderRadius: 44 },
-  changePhotoButton: {
-    backgroundColor: "#EFF6FF",
-    borderWidth: 1,
-    borderColor: "#BFDBFE",
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  changePhotoText: { color: "#2563EB", fontSize: 14, fontWeight: "600" },
-  removePhotoText: { color: "#9CA3AF", fontSize: 13 },
+  changePhotoButton: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
+  changePhotoText: { fontSize: 14, fontWeight: "600" },
+  removePhotoText: { fontSize: 13 },
   formGroup: { marginBottom: 22 },
-  label: { fontSize: 16, fontWeight: "700", color: "#0F172A", marginBottom: 8 },
-  input: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 14,
-    padding: 16,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
+  label: { fontSize: 16, fontWeight: "700", marginBottom: 8 },
+  input: { borderRadius: 14, padding: 16, fontSize: 16, borderWidth: 1 },
   textArea: { minHeight: 100, textAlignVertical: "top" },
-  saveButton: {
-    backgroundColor: "#2563EB",
-    padding: 18,
-    borderRadius: 16,
-    alignItems: "center",
-    marginTop: 10,
-    marginBottom: 40,
-  },
+  saveButton: { padding: 18, borderRadius: 16, alignItems: "center", marginTop: 10, marginBottom: 40 },
   saveButtonText: { color: "#FFFFFF", fontSize: 17, fontWeight: "700" },
 });

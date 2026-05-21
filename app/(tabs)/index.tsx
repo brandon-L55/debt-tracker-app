@@ -66,6 +66,7 @@ export default function HomeScreen() {
   const { colors: t } = useTheme();
   const [sort, setSort] = useState<DebtSortOption>("date");
   const [showSortMenu, setShowSortMenu] = useState(false);
+  const [visibleDebtCount, setVisibleDebtCount] = useState(10);
 
   const td = today();
   const youOwe = debts.filter(d => d.direction === "me").reduce((s, d) => s + d.amount, 0);
@@ -78,21 +79,23 @@ export default function HomeScreen() {
       <Text style={[styles.title, { color: t.text }]}>Dashboard</Text>
       <Text style={[styles.subtitle, { color: t.textSub }]}>Your personal debt dashboard</Text>
 
-      <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
-        <Text style={[styles.cardLabel, { color: t.textSub }]}>You Owe</Text>
-        <Text style={[styles.cardValue, { color: t.text }]}>${youOwe.toFixed(2)}</Text>
-      </View>
-      <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
-        <Text style={[styles.cardLabel, { color: t.textSub }]}>Owed to You</Text>
-        <Text style={[styles.cardValue, { color: t.text }]}>${owedToYou.toFixed(2)}</Text>
-      </View>
-      <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
-        <Text style={[styles.cardLabel, { color: t.textSub }]}>Total Paid</Text>
-        <Text style={[styles.cardValue, { color: t.text }]}>$0.00</Text>
-      </View>
-      <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
-        <Text style={[styles.cardLabel, { color: t.textSub }]}>Total Received</Text>
-        <Text style={[styles.cardValue, { color: t.text }]}>$0.00</Text>
+      <View style={styles.statsGrid}>
+        <View style={[styles.statCard, { backgroundColor: t.card, borderColor: t.border }]}>
+          <Text style={[styles.statLabel, { color: t.textSub }]}>You Owe</Text>
+          <Text style={[styles.statValue, { color: t.red }]}>${youOwe.toFixed(2)}</Text>
+        </View>
+        <View style={[styles.statCard, { backgroundColor: t.card, borderColor: t.border }]}>
+          <Text style={[styles.statLabel, { color: t.textSub }]}>Owed to You</Text>
+          <Text style={[styles.statValue, { color: t.green }]}>${owedToYou.toFixed(2)}</Text>
+        </View>
+        <View style={[styles.statCard, { backgroundColor: t.card, borderColor: t.border }]}>
+          <Text style={[styles.statLabel, { color: t.textSub }]}>Total Paid</Text>
+          <Text style={[styles.statValue, { color: t.text }]}>$0.00</Text>
+        </View>
+        <View style={[styles.statCard, { backgroundColor: t.card, borderColor: t.border }]}>
+          <Text style={[styles.statLabel, { color: t.textSub }]}>Total Received</Text>
+          <Text style={[styles.statValue, { color: t.text }]}>$0.00</Text>
+        </View>
       </View>
 
       <Pressable style={[styles.addBtn, { backgroundColor: t.primary }]} onPress={() => router.push("/add-debt" as any)}>
@@ -116,24 +119,54 @@ export default function HomeScreen() {
             <View style={styles.emptyFiltered}>
               <Text style={[styles.emptyFilteredText, { color: t.textMuted }]}>No debts match this filter.</Text>
             </View>
-          ) : displayDebts.map(debt => {
-            const dl = dlInfo(debt.deadline, td);
-            return (
-              <View key={debt.id} style={[styles.debtRow, { backgroundColor: t.card, borderColor: t.border }]}>
-                <View style={styles.debtLeft}>
-                  <Text style={[styles.debtPerson, { color: t.text }]}>{debt.person}</Text>
-                  {debt.reason ? <Text style={[styles.debtReason, { color: t.textSub }]}>{debt.reason}</Text> : null}
-                  {dl ? <Text style={[styles.dlLabel, { color: dl.overdue ? t.red : t.primary }]}>{dl.label}{dl.overdue ? " · Overdue" : ""}</Text> : null}
-                </View>
-                <View style={styles.debtRight}>
-                  <Text style={[styles.debtAmount, { color: debt.direction === "me" ? t.red : t.green }]}>
-                    {debt.direction === "me" ? "-" : "+"}${debt.amount.toFixed(2)}
+          ) : (
+            <>
+              {displayDebts.slice(0, visibleDebtCount).map(debt => {
+                const dl = dlInfo(debt.deadline, td);
+                return (
+                  <View key={debt.id} style={[styles.debtRow, { backgroundColor: t.card, borderColor: t.border }]}>
+                    <View style={styles.debtLeft}>
+                      <Text style={[styles.debtPerson, { color: t.text }]}>{debt.person}</Text>
+                      {debt.reason ? <Text style={[styles.debtReason, { color: t.textSub }]}>{debt.reason}</Text> : null}
+                      {dl ? <Text style={[styles.dlLabel, { color: dl.overdue ? t.red : t.primary }]}>{dl.label}{dl.overdue ? " · Overdue" : ""}</Text> : null}
+                    </View>
+                    <View style={styles.debtRight}>
+                      <Text style={[styles.debtAmount, { color: debt.direction === "me" ? t.red : t.green }]}>
+                        {debt.direction === "me" ? "-" : "+"}${debt.amount.toFixed(2)}
+                      </Text>
+                      <Text style={[styles.debtDir, { color: t.textSub }]}>{debt.direction === "me" ? "You owe" : "Owes you"}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+              {visibleDebtCount < displayDebts.length && (
+                <Pressable
+                  style={[styles.loadMoreBtn, { backgroundColor: t.card, borderColor: t.border }]}
+                  onPress={() => setVisibleDebtCount(c => Math.min(c + 10, displayDebts.length))}
+                >
+                  <Text style={[styles.loadMoreText, { color: t.primary }]}>
+                    Load More ({displayDebts.length - visibleDebtCount} remaining)
                   </Text>
-                  <Text style={[styles.debtDir, { color: t.textSub }]}>{debt.direction === "me" ? "You owe" : "Owes you"}</Text>
+                </Pressable>
+              )}
+              {visibleDebtCount > 10 && (
+                <View style={styles.collapseRow}>
+                  <Pressable
+                    style={[styles.collapseBtn, { backgroundColor: t.card, borderColor: t.border }]}
+                    onPress={() => setVisibleDebtCount(c => Math.max(c - 10, 10))}
+                  >
+                    <Text style={[styles.collapseBtnText, { color: t.textSub }]}>Show Less</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.collapseBtn, { backgroundColor: t.card, borderColor: t.border }]}
+                    onPress={() => setVisibleDebtCount(10)}
+                  >
+                    <Text style={[styles.collapseBtnText, { color: t.textSub }]}>Back to 10</Text>
+                  </Pressable>
                 </View>
-              </View>
-            );
-          })}
+              )}
+            </>
+          )}
         </View>
       )}
 
@@ -165,6 +198,10 @@ const styles = StyleSheet.create({
   card: { borderRadius: 16, padding: 20, marginBottom: 16, borderWidth: 1 },
   cardLabel: { fontSize: 16 },
   cardValue: { fontSize: 28, fontWeight: "700", marginTop: 8 },
+  statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 20 },
+  statCard: { width: "48%", aspectRatio: 1.55, borderRadius: 16, padding: 16, borderWidth: 1, justifyContent: "space-between" },
+  statLabel: { fontSize: 13, fontWeight: "500" },
+  statValue: { fontSize: 26, fontWeight: "700" },
   addBtn: { padding: 18, borderRadius: 16, alignItems: "center", marginTop: 8 },
   addBtnText: { color: "#FFFFFF", fontSize: 17, fontWeight: "700" },
   section: { marginTop: 32 },
@@ -183,6 +220,11 @@ const styles = StyleSheet.create({
   debtRight: { alignItems: "flex-end" },
   debtAmount: { fontSize: 18, fontWeight: "700" },
   debtDir: { fontSize: 12, marginTop: 2 },
+  loadMoreBtn: { borderRadius: 14, borderWidth: 1, padding: 14, alignItems: "center", marginBottom: 10 },
+  loadMoreText: { fontSize: 15, fontWeight: "600" },
+  collapseRow: { flexDirection: "row", gap: 8, marginBottom: 10 },
+  collapseBtn: { flex: 1, borderRadius: 14, borderWidth: 1, padding: 12, alignItems: "center" },
+  collapseBtnText: { fontSize: 14, fontWeight: "600" },
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", alignItems: "center" },
   menu: { borderRadius: 20, paddingVertical: 8, width: 280, shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 8 },
   menuTitle: { fontSize: 12, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.8, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },

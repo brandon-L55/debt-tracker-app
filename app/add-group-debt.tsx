@@ -55,8 +55,6 @@ export default function AddGroupDebtScreen() {
     const parsedAmount = parseFloat(amount);
     if (!parsedAmount || parsedAmount <= 0) { Alert.alert("Invalid amount", "Please enter an amount greater than $0.00."); return; }
     if (selected.length === 0) { Alert.alert("No members selected", "Select at least one group member."); return; }
-    if (!reason.trim()) { Alert.alert("Missing reason", "Please enter a reason for this debt."); return; }
-
     let deadlineISO: string | null = null;
     if (deadline.trim()) {
       deadlineISO = parseDeadlineInput(deadline);
@@ -146,7 +144,7 @@ export default function AddGroupDebtScreen() {
 
       {/* Reason */}
       <View style={styles.formGroup}>
-        <Text style={[styles.label, { color: t.text }]}>Reason</Text>
+        <Text style={[styles.label, { color: t.text }]}>Reason <Text style={[styles.labelOptional, { color: t.textMuted }]}>(optional)</Text></Text>
         <TextInput
           style={[styles.input, styles.textArea, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
           placeholder="Dinner, hotel, activity, etc."

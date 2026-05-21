@@ -32,7 +32,7 @@ export default function AddDebtScreen() {
   const [people, setPeople] = useState<string[]>([]);
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
-  const [direction, setDirection] = useState<"them" | "me">("them");
+  const [direction, setDirection] = useState<"them" | "me" | null>(null);
   const [splitEvenly, setSplitEvenly] = useState(false);
   const [deadline, setDeadline] = useState("");
 
@@ -46,17 +46,20 @@ export default function AddDebtScreen() {
   function handleSave() {
     const parsedAmount = parseFloat(amount);
     if (!parsedAmount || parsedAmount <= 0) { Alert.alert("Invalid amount", "Please enter an amount greater than $0.00."); return; }
-    if (people.length === 0) { Alert.alert("No people added", "Add at least one person to this debt."); return; }
-    if (!reason.trim()) { Alert.alert("Missing reason", "Please enter a reason for this debt."); return; }
-
+    const trimmedInput = personInput.trim();
+    const effectivePeople = trimmedInput && !people.includes(trimmedInput)
+      ? [...people, trimmedInput]
+      : people;
+    if (effectivePeople.length === 0) { Alert.alert("No people added", "Add at least one person to this debt."); return; }
+    if (!direction) { Alert.alert("Missing selection", 'Please select "They owe me" or "I owe them".'); return; }
     let deadlineISO: string | null = null;
     if (deadline.trim()) {
       deadlineISO = parseDeadlineInput(deadline);
       if (!deadlineISO) { Alert.alert("Invalid date", "Enter the deadline as MM/DD/YYYY or leave it blank."); return; }
     }
 
-    const perPersonAmount = splitEvenly ? parsedAmount / (people.length + 1) : parsedAmount;
-    for (const person of people) {
+    const perPersonAmount = splitEvenly ? parsedAmount / (effectivePeople.length + 1) : parsedAmount;
+    for (const person of effectivePeople) {
       addDebt({ person, amount: parseFloat(perPersonAmount.toFixed(2)), direction, reason: reason.trim(), deadline: deadlineISO });
     }
     router.back();
@@ -74,20 +77,18 @@ export default function AddDebtScreen() {
       {/* People */}
       <View style={styles.formGroup}>
         <Text style={[styles.label, { color: t.text }]}>People</Text>
-        <View style={styles.personRow}>
-          <TextInput
-            style={[styles.input, styles.personInput, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
-            placeholder="Name, phone, or @username"
-            placeholderTextColor={t.textMuted}
-            value={personInput}
-            onChangeText={setPersonInput}
-            onSubmitEditing={handleAddPerson}
-            returnKeyType="done"
-          />
-          <Pressable style={[styles.addPersonBtn, { backgroundColor: t.primary }]} onPress={handleAddPerson}>
-            <Text style={styles.addPersonBtnText}>Add</Text>
-          </Pressable>
-        </View>
+        <TextInput
+          style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
+          placeholder="Name, phone, or @username"
+          placeholderTextColor={t.textMuted}
+          value={personInput}
+          onChangeText={setPersonInput}
+          onSubmitEditing={handleAddPerson}
+          returnKeyType="done"
+        />
+        <Pressable style={[styles.addPersonBtn, { backgroundColor: t.input, borderColor: t.border }]} onPress={handleAddPerson}>
+          <Text style={[styles.addPersonBtnText, { color: t.primary }]}>+ Add Person</Text>
+        </Pressable>
         {people.length > 0 && (
           <View style={styles.chips}>
             {people.map(p => (
@@ -118,17 +119,6 @@ export default function AddDebtScreen() {
       {/* Direction */}
       <View style={styles.formGroup}>
         <Text style={[styles.label, { color: t.text }]}>Who owes who?</Text>
-        {(["them", "me"] as const).map(opt => (
-          <Pressable
-            key={opt}
-            style={[styles.optionBtn, { backgroundColor: direction === opt ? t.primarySoft : t.card, borderColor: direction === opt ? t.primary : t.border }, { marginBottom: 10 }]}
-            onPress={() => setDirection(opt)}
-          >
-            <Text style={[styles.optionText, { color: direction === opt ? t.primary : t.text }]}>
-              {opt === "them" ? "They owe me" : "I owe them"}
-            </Text>
-          </Pressable>
-        ))}
         <Pressable
           style={[styles.splitBtn, { backgroundColor: splitEvenly ? t.greenSoft : t.card, borderColor: splitEvenly ? t.green : t.border }]}
           onPress={() => setSplitEvenly(s => !s)}
@@ -145,11 +135,22 @@ export default function AddDebtScreen() {
             </Text>
           )}
         </Pressable>
+        {(["them", "me"] as const).map(opt => (
+          <Pressable
+            key={opt}
+            style={[styles.optionBtn, { backgroundColor: direction === opt ? t.primarySoft : t.card, borderColor: direction === opt ? t.primary : t.border }, { marginTop: 10 }]}
+            onPress={() => setDirection(direction === opt ? null : opt)}
+          >
+            <Text style={[styles.optionText, { color: direction === opt ? t.primary : t.text }]}>
+              {opt === "them" ? "They owe me" : "I owe them"}
+            </Text>
+          </Pressable>
+        ))}
       </View>
 
       {/* Reason */}
       <View style={styles.formGroup}>
-        <Text style={[styles.label, { color: t.text }]}>Reason</Text>
+        <Text style={[styles.label, { color: t.text }]}>Reason <Text style={[styles.labelOptional, { color: t.textMuted }]}>(optional)</Text></Text>
         <TextInput
           style={[styles.input, styles.textArea, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
           placeholder="Dinner, tickets, Uber, rent, etc."
@@ -200,17 +201,15 @@ const styles = StyleSheet.create({
   labelOptional: { fontSize: 14, fontWeight: "400" },
   input: { borderRadius: 14, padding: 16, fontSize: 16, borderWidth: 1 },
   textArea: { minHeight: 100, textAlignVertical: "top" },
-  personRow: { flexDirection: "row", gap: 8 },
-  personInput: { flex: 1 },
-  addPersonBtn: { borderRadius: 14, paddingHorizontal: 20, justifyContent: "center" },
-  addPersonBtnText: { color: "#FFFFFF", fontSize: 15, fontWeight: "700" },
+  addPersonBtn: { borderRadius: 14, padding: 14, alignItems: "center", borderWidth: 1, marginTop: 8 },
+  addPersonBtnText: { fontSize: 15, fontWeight: "700" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 },
   chip: { flexDirection: "row", alignItems: "center", borderRadius: 20, paddingVertical: 6, paddingLeft: 12, paddingRight: 8, borderWidth: 1, gap: 4 },
   chipText: { fontSize: 14, fontWeight: "600" },
   chipRemove: { fontSize: 18, lineHeight: 20 },
   optionBtn: { padding: 16, borderRadius: 14, borderWidth: 1 },
   optionText: { fontSize: 16, fontWeight: "600" },
-  splitBtn: { padding: 16, borderRadius: 14, borderWidth: 1, marginTop: 4 },
+  splitBtn: { padding: 16, borderRadius: 14, borderWidth: 1, marginBottom: 10 },
   splitInner: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   splitText: { fontSize: 16, fontWeight: "600" },
   toggle: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3 },

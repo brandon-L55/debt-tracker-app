@@ -10,11 +10,13 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useDebts } from "@/context/DebtContext";
+import { useTheme } from "@/context/ThemeContext";
 import type { GroupMember } from "@/context/DebtContext";
 
 export default function CreateGroupScreen() {
   const router = useRouter();
   const { addGroup } = useDebts();
+  const { colors: t } = useTheme();
 
   const [groupName, setGroupName] = useState("");
   const [description, setDescription] = useState("");
@@ -58,25 +60,27 @@ export default function CreateGroupScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
-      <Text style={styles.title}>Create Group</Text>
-      <Text style={styles.subtitle}>Organize debts for a trip, event, or friend group.</Text>
+    <ScrollView style={[styles.container, { backgroundColor: t.bg }]} keyboardShouldPersistTaps="handled">
+      <Text style={[styles.title, { color: t.text }]}>Create Group</Text>
+      <Text style={[styles.subtitle, { color: t.textSub }]}>Organize debts for a trip, event, or friend group.</Text>
 
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Group name *</Text>
+        <Text style={[styles.label, { color: t.text }]}>Group name *</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
           placeholder="e.g. Cabo Trip, Apartment, Dinner Club"
+          placeholderTextColor={t.textMuted}
           value={groupName}
           onChangeText={setGroupName}
         />
       </View>
 
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Description (optional)</Text>
+        <Text style={[styles.label, { color: t.text }]}>Description (optional)</Text>
         <TextInput
-          style={[styles.input, styles.textArea]}
+          style={[styles.input, styles.textArea, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
           placeholder="What is this group for?"
+          placeholderTextColor={t.textMuted}
           multiline
           value={description}
           onChangeText={setDescription}
@@ -84,37 +88,39 @@ export default function CreateGroupScreen() {
       </View>
 
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Members</Text>
+        <Text style={[styles.label, { color: t.text }]}>Members</Text>
 
         <View style={styles.memberInputRow}>
           <TextInput
-            style={[styles.input, styles.memberNameInput]}
+            style={[styles.input, styles.memberNameInput, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
             placeholder="Name"
+            placeholderTextColor={t.textMuted}
             value={memberName}
             onChangeText={setMemberName}
           />
           <TextInput
-            style={[styles.input, styles.memberContactInput]}
+            style={[styles.input, styles.memberContactInput, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
             placeholder="Phone or @username"
+            placeholderTextColor={t.textMuted}
             value={memberContact}
             onChangeText={setMemberContact}
             autoCapitalize="none"
           />
         </View>
-        <Pressable style={styles.addMemberButton} onPress={handleAddMember}>
-          <Text style={styles.addMemberText}>+ Add Member</Text>
+        <Pressable style={[styles.addMemberButton, { backgroundColor: t.primarySoft, borderColor: t.primaryBorder }]} onPress={handleAddMember}>
+          <Text style={[styles.addMemberText, { color: t.primary }]}>+ Add Member</Text>
         </Pressable>
 
         {members.length > 0 && (
           <View style={styles.memberList}>
             {members.map(m => (
-              <View key={m.id} style={styles.memberRow}>
+              <View key={m.id} style={[styles.memberRow, { backgroundColor: t.card, borderColor: t.border }]}>
                 <View>
-                  <Text style={styles.memberName}>{m.name}</Text>
-                  <Text style={styles.memberContact}>{m.phoneOrUsername}</Text>
+                  <Text style={[styles.memberName, { color: t.text }]}>{m.name}</Text>
+                  <Text style={[styles.memberContact, { color: t.textSub }]}>{m.phoneOrUsername}</Text>
                 </View>
                 <Pressable onPress={() => handleRemoveMember(m.id)}>
-                  <Text style={styles.removeText}>Remove</Text>
+                  <Text style={[styles.removeText, { color: t.red }]}>Remove</Text>
                 </Pressable>
               </View>
             ))}
@@ -122,7 +128,7 @@ export default function CreateGroupScreen() {
         )}
       </View>
 
-      <Pressable style={styles.saveButton} onPress={handleSave}>
+      <Pressable style={[styles.saveButton, { backgroundColor: t.primary }]} onPress={handleSave}>
         <Text style={styles.saveButtonText}>Save Group</Text>
       </Pressable>
     </ScrollView>
@@ -130,107 +136,30 @@ export default function CreateGroupScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: "#F8FAFC",
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: "700",
-    marginTop: 40,
-    color: "#0F172A",
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "#64748B",
-    marginBottom: 28,
-  },
-  formGroup: {
-    marginBottom: 22,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#0F172A",
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 14,
-    padding: 16,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
-  textArea: {
-    minHeight: 80,
-    textAlignVertical: "top",
-  },
-  memberInputRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 10,
-  },
-  memberNameInput: {
-    flex: 1,
-  },
-  memberContactInput: {
-    flex: 1,
-  },
-  addMemberButton: {
-    backgroundColor: "#EFF6FF",
-    borderWidth: 1,
-    borderColor: "#BFDBFE",
-    padding: 14,
-    borderRadius: 14,
-    alignItems: "center",
-  },
-  addMemberText: {
-    color: "#2563EB",
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  memberList: {
-    marginTop: 14,
-    gap: 8,
-  },
+  container: { flex: 1, padding: 20 },
+  title: { fontSize: 32, fontWeight: "700", marginTop: 40 },
+  subtitle: { fontSize: 16, marginBottom: 28 },
+  formGroup: { marginBottom: 22 },
+  label: { fontSize: 16, fontWeight: "700", marginBottom: 8 },
+  input: { borderRadius: 14, padding: 16, fontSize: 16, borderWidth: 1 },
+  textArea: { minHeight: 80, textAlignVertical: "top" },
+  memberInputRow: { flexDirection: "row", gap: 8, marginBottom: 10 },
+  memberNameInput: { flex: 1 },
+  memberContactInput: { flex: 1 },
+  addMemberButton: { borderWidth: 1, padding: 14, borderRadius: 14, alignItems: "center" },
+  addMemberText: { fontSize: 15, fontWeight: "600" },
+  memberList: { marginTop: 14, gap: 8 },
   memberRow: {
-    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-  memberName: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#111827",
-  },
-  memberContact: {
-    fontSize: 13,
-    color: "#6B7280",
-    marginTop: 2,
-  },
-  removeText: {
-    fontSize: 14,
-    color: "#DC2626",
-    fontWeight: "600",
-  },
-  saveButton: {
-    backgroundColor: "#2563EB",
-    padding: 18,
-    borderRadius: 16,
-    alignItems: "center",
-    marginTop: 10,
-    marginBottom: 40,
-  },
-  saveButtonText: {
-    color: "#FFFFFF",
-    fontSize: 17,
-    fontWeight: "700",
-  },
+  memberName: { fontSize: 15, fontWeight: "600" },
+  memberContact: { fontSize: 13, marginTop: 2 },
+  removeText: { fontSize: 14, fontWeight: "600" },
+  saveButton: { padding: 18, borderRadius: 16, alignItems: "center", marginTop: 10, marginBottom: 40 },
+  saveButtonText: { color: "#FFFFFF", fontSize: 17, fontWeight: "700" },
 });

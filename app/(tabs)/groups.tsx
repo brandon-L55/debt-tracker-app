@@ -1,6 +1,7 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
-import { Modal, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import { useRouter } from "expo-router";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { Alert, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
+import { useFocusEffect, useRouter } from "expo-router";
 // @ts-ignore — forwardRef deprecation hint from React 19; library still works correctly
 import DraggableFlatList, { ScaleDecorator } from "react-native-draggable-flatlist";
 import type { RenderItemParams } from "react-native-draggable-flatlist";
@@ -10,16 +11,20 @@ import { Avatar } from "@/components/Avatar";
 import type { Group, Debt } from "@/context/DebtContext";
 
 // "custom" = post-drag order; not shown in the sort menu
-type SortOption = "az" | "za" | "date" | "amount-high" | "amount-low" | "members" | "custom";
+type SortOption = "az" | "za" | "latest-debt" | "members" | "custom";
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "az", label: "Alphabetical" },
   { value: "za", label: "Reverse Alphabetical" },
-  { value: "date", label: "Date Added" },
-  { value: "amount-high", label: "Amount Owed: Highest First" },
-  { value: "amount-low", label: "Amount Owed: Lowest First" },
-  { value: "members", label: "Member Count" },
+  { value: "latest-debt", label: "Latest debt" },
+  { value: "members", label: "Member count" },
 ];
+
+function latestGroupDebtDate(groupId: string, debts: Debt[]): number {
+  const matches = debts.filter(d => d.groupId === groupId);
+  if (matches.length === 0) return 0;
+  return Math.max(...matches.map(d => new Date(d.createdAt).getTime()));
+}
 
 function calcGroupTotal(groupId: string, debts: Debt[]): number {
   return debts.filter(d => d.groupId === groupId)
@@ -28,11 +33,25 @@ function calcGroupTotal(groupId: string, debts: Debt[]): number {
 
 export default function GroupsScreen() {
   const router = useRouter();
-  const { groups, debts, groupOrder, setGroupOrder } = useDebts();
+  const { groups, debts, groupOrder, setGroupOrder, updateGroup, deleteGroup } = useDebts();
   const { colors: t } = useTheme();
   const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<SortOption>("date");
+  const [sort, setSort] = useState<SortOption>("latest-debt");
   const [showSortMenu, setShowSortMenu] = useState(false);
+
+  const swipeableRefs = useRef<Map<string, { current: any }>>(new Map());
+  const openIdRef = useRef<string | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        if (openIdRef.current) {
+          swipeableRefs.current.get(openIdRef.current)?.current?.close();
+          openIdRef.current = null;
+        }
+      };
+    }, [])
+  );
 
   const reconciledOrder = useMemo(() => {
     const valid = new Set(groups.map(g => g.id));
@@ -54,11 +73,12 @@ export default function GroupsScreen() {
       const items = reconciledOrder
         .map(id => groups.find(g => g.id === id))
         .filter((x): x is Group => !!x);
-      return q ? items.filter(g =>
+      const filtered2 = q ? items.filter(g =>
         g.name.toLowerCase().includes(q) ||
         (g.description ?? "").toLowerCase().includes(q) ||
         g.members.some(m => m.name.toLowerCase().includes(q))
       ) : items;
+      return [...filtered2.filter(g => g.pinned), ...filtered2.filter(g => !g.pinned)];
     }
 
     const filtered = groups.filter(g =>
@@ -67,17 +87,16 @@ export default function GroupsScreen() {
       g.members.some(m => m.name.toLowerCase().includes(q))
     );
 
-    return [...filtered].sort((a, b) => {
+    const sorted = [...filtered].sort((a, b) => {
       switch (sort) {
         case "az": return a.name.localeCompare(b.name);
         case "za": return b.name.localeCompare(a.name);
-        case "date": return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        case "amount-high": return calcGroupTotal(b.id, debts) - calcGroupTotal(a.id, debts);
-        case "amount-low": return calcGroupTotal(a.id, debts) - calcGroupTotal(b.id, debts);
+        case "latest-debt": return latestGroupDebtDate(b.id, debts) - latestGroupDebtDate(a.id, debts);
         case "members": return b.members.length - a.members.length;
         default: return 0;
       }
     });
+    return [...sorted.filter(g => g.pinned), ...sorted.filter(g => !g.pinned)];
   }, [groups, debts, search, sort, reconciledOrder]);
 
   const activeSortLabel = SORT_OPTIONS.find(o => o.value === sort)?.label ?? "";
@@ -88,40 +107,100 @@ export default function GroupsScreen() {
       : total > 0 ? `+$${total.toFixed(2)}` : `-$${Math.abs(total).toFixed(2)}`;
     const totalColor = total > 0 ? t.green : total < 0 ? t.red : t.textSub;
 
+    function renderRightActions() {
+      return (
+        <View style={styles.swipeActions}>
+          <Pressable
+            style={[styles.swipeAction, { backgroundColor: t.border }]}
+            onPress={() => updateGroup(item.id, { silenced: !item.silenced })}
+          >
+            <Text style={styles.swipeActionIcon}>{item.silenced ? "🔔" : "🔕"}</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.swipeAction, { backgroundColor: t.primarySoft }]}
+            onPress={() => updateGroup(item.id, { pinned: !item.pinned })}
+          >
+            <Text style={styles.swipeActionIcon}>{item.pinned ? "📌" : "📍"}</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.swipeAction, { backgroundColor: t.redSoft }]}
+            onPress={() =>
+              Alert.alert(
+                "Delete Group",
+                `Are you sure you want to delete ${item.name}?`,
+                [
+                  { text: "Cancel", style: "cancel" },
+                  { text: "Delete", style: "destructive", onPress: () => deleteGroup(item.id) },
+                ]
+              )
+            }
+          >
+            <Text style={styles.swipeActionIcon}>🗑️</Text>
+          </Pressable>
+        </View>
+      );
+    }
+
+    if (!swipeableRefs.current.has(item.id)) {
+      swipeableRefs.current.set(item.id, { current: null });
+    }
+    const itemRef = swipeableRefs.current.get(item.id)!;
+
     return (
       <ScaleDecorator activeScale={1.02}>
-        <TouchableOpacity
-          style={[
-            styles.card,
-            { backgroundColor: isActive ? t.primarySoft : t.card, borderColor: isActive ? t.primaryBorder : t.border },
-          ]}
-          onPress={() => router.push(`/group/${item.id}` as any)}
-          onLongPress={drag}
-          delayLongPress={250}
-          activeOpacity={0.85}
-          disabled={isActive}
+        <ReanimatedSwipeable
+          friction={1.5}
+          rightThreshold={30}
+          overshootRight={false}
+          renderRightActions={renderRightActions}
+          ref={itemRef}
+          onSwipeableOpen={() => {
+            if (openIdRef.current && openIdRef.current !== item.id) {
+              swipeableRefs.current.get(openIdRef.current)?.current?.close();
+            }
+            openIdRef.current = item.id;
+          }}
+          onSwipeableClose={() => {
+            if (openIdRef.current === item.id) openIdRef.current = null;
+          }}
         >
-          <View style={styles.cardInner}>
-            <View style={styles.dragHandle}>
-              <Text style={[styles.dragIcon, { color: t.textMuted }]}>☰</Text>
+          <Pressable
+            style={({ pressed }) => [
+              styles.card,
+              { backgroundColor: isActive ? t.primarySoft : t.card, borderColor: isActive ? t.primaryBorder : t.border },
+              pressed && { opacity: 0.85 },
+            ]}
+            onPress={() => router.push(`/group/${item.id}` as any)}
+            onLongPress={drag}
+            delayLongPress={250}
+            disabled={isActive}
+          >
+            <View style={styles.cardInner}>
+              <View style={styles.dragHandle}>
+                <Text style={[styles.dragIcon, { color: t.textMuted }]}>☰</Text>
+              </View>
+              <Avatar name={item.name} imageUri={item.imageUri} size={44} />
+              <View style={styles.cardText}>
+                <View style={styles.cardNameRow}>
+                  <Text style={[styles.cardName, { color: t.text }]}>{item.name}</Text>
+                  {item.pinned ? <Text style={styles.cardBadge}>📌</Text> : null}
+                  {item.silenced ? <Text style={styles.cardBadge}>🔇</Text> : null}
+                </View>
+                <Text style={[styles.cardMeta, { color: t.textSub }]}>
+                  {item.members.length} {item.members.length === 1 ? "member" : "members"}
+                </Text>
+                {item.description ? <Text style={[styles.cardDesc, { color: t.textMuted }]}>{item.description}</Text> : null}
+              </View>
+              <View style={styles.cardRight}>
+                <Text style={[styles.cardTotal, { color: totalColor }]}>{totalLabel}</Text>
+                <Text style={[styles.chevron, { color: t.border }]}>›</Text>
+              </View>
             </View>
-            <Avatar name={item.name} imageUri={item.imageUri} size={44} />
-            <View style={styles.cardText}>
-              <Text style={[styles.cardName, { color: t.text }]}>{item.name}</Text>
-              <Text style={[styles.cardMeta, { color: t.textSub }]}>
-                {item.members.length} {item.members.length === 1 ? "member" : "members"}
-              </Text>
-              {item.description ? <Text style={[styles.cardDesc, { color: t.textMuted }]}>{item.description}</Text> : null}
-            </View>
-            <View style={styles.cardRight}>
-              <Text style={[styles.cardTotal, { color: totalColor }]}>{totalLabel}</Text>
-              <Text style={[styles.chevron, { color: t.border }]}>›</Text>
-            </View>
-          </View>
-        </TouchableOpacity>
+          </Pressable>
+        </ReanimatedSwipeable>
       </ScaleDecorator>
     );
-  }, [debts, router, t]);
+  }, [debts, router, t, updateGroup, deleteGroup]);
 
   const listHeader = (
     <View>
@@ -142,16 +221,16 @@ export default function GroupsScreen() {
         />
         <Pressable
           style={[styles.sortBtn, {
-            backgroundColor: (sort !== "date" && sort !== "custom") ? t.primarySoft : t.card,
-            borderColor: (sort !== "date" && sort !== "custom") ? t.primaryBorder : t.border,
+            backgroundColor: (sort !== "latest-debt" && sort !== "custom") ? t.primarySoft : t.card,
+            borderColor: (sort !== "latest-debt" && sort !== "custom") ? t.primaryBorder : t.border,
           }]}
           onPress={() => setShowSortMenu(true)}
         >
-          <Text style={[styles.sortBtnIcon, { color: (sort !== "date" && sort !== "custom") ? t.primary : t.text }]}>⇅</Text>
+          <Text style={[styles.sortBtnIcon, { color: (sort !== "latest-debt" && sort !== "custom") ? t.primary : t.text }]}>⇅</Text>
         </Pressable>
       </View>
-      {(sort !== "date" && sort !== "custom") && <Text style={[styles.sortHint, { color: t.textSub }]}>Sorted by: {activeSortLabel}</Text>}
-      <Text style={[styles.dragHint, { color: t.textMuted }]}>Long-press any card to drag and reorder</Text>
+      {(sort !== "latest-debt" && sort !== "custom") && <Text style={[styles.sortHint, { color: t.textSub }]}>Sorted by: {activeSortLabel}</Text>}
+      <Text style={[styles.dragHint, { color: t.textMuted }]}>Long-press any card (three lines on left) to drag and reorder</Text>
     </View>
   );
 
@@ -231,6 +310,11 @@ const styles = StyleSheet.create({
   cardTotal: { fontSize: 15, fontWeight: "700" },
   chevron: { fontSize: 20 },
   balanceBadge: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4 },
+  cardNameRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  cardBadge: { fontSize: 12 },
+  swipeActions: { flexDirection: "row" },
+  swipeAction: { width: 54, justifyContent: "center", alignItems: "center" },
+  swipeActionIcon: { fontSize: 20 },
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", alignItems: "center" },
   menu: { borderRadius: 20, paddingVertical: 8, width: 280, shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 8 },
   menuTitle: { fontSize: 12, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.8, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },

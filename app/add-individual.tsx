@@ -12,11 +12,13 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useDebts } from "@/context/DebtContext";
+import { useTheme } from "@/context/ThemeContext";
 import { Avatar } from "@/components/Avatar";
 
 export default function AddIndividualScreen() {
   const router = useRouter();
   const { addIndividual } = useDebts();
+  const { colors: t } = useTheme();
   const [name, setName] = useState("");
   const [nickname, setNickname] = useState("");
   const [phoneOrUsername, setPhoneOrUsername] = useState("");
@@ -60,52 +62,54 @@ export default function AddIndividualScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
-      <Text style={styles.title}>Add Individual</Text>
-      <Text style={styles.subtitle}>Add someone you share debts with.</Text>
+    <ScrollView style={[styles.container, { backgroundColor: t.bg }]} keyboardShouldPersistTaps="handled">
+      <Text style={[styles.title, { color: t.text }]}>Add Individual</Text>
+      <Text style={[styles.subtitle, { color: t.textSub }]}>Add someone you share debts with.</Text>
 
-      {/* Avatar picker */}
       <View style={styles.avatarSection}>
         {imageUri ? (
           <Image source={{ uri: imageUri }} style={styles.avatarImage} />
         ) : (
           <Avatar name={name || "?"} size={88} />
         )}
-        <Pressable style={styles.addPhotoButton} onPress={pickImage}>
-          <Text style={styles.addPhotoText}>{imageUri ? "Change Photo" : "Add Photo"}</Text>
+        <Pressable style={[styles.addPhotoButton, { backgroundColor: t.primarySoft, borderColor: t.primaryBorder }]} onPress={pickImage}>
+          <Text style={[styles.addPhotoText, { color: t.primary }]}>{imageUri ? "Change Photo" : "Add Photo"}</Text>
         </Pressable>
         {imageUri ? (
           <Pressable onPress={() => setImageUri("")}>
-            <Text style={styles.removePhotoText}>Remove Photo</Text>
+            <Text style={[styles.removePhotoText, { color: t.textMuted }]}>Remove Photo</Text>
           </Pressable>
         ) : null}
       </View>
 
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Name *</Text>
+        <Text style={[styles.label, { color: t.text }]}>Name *</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
           placeholder="Full name"
+          placeholderTextColor={t.textMuted}
           value={name}
           onChangeText={setName}
         />
       </View>
 
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Nickname</Text>
+        <Text style={[styles.label, { color: t.text }]}>Nickname</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
           placeholder="What do you call them?"
+          placeholderTextColor={t.textMuted}
           value={nickname}
           onChangeText={setNickname}
         />
       </View>
 
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Phone number or username *</Text>
+        <Text style={[styles.label, { color: t.text }]}>Phone number or username *</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
           placeholder="+1 555-000-0000 or @username"
+          placeholderTextColor={t.textMuted}
           value={phoneOrUsername}
           onChangeText={setPhoneOrUsername}
           keyboardType="default"
@@ -114,17 +118,18 @@ export default function AddIndividualScreen() {
       </View>
 
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Notes (optional)</Text>
+        <Text style={[styles.label, { color: t.text }]}>Notes (optional)</Text>
         <TextInput
-          style={[styles.input, styles.textArea]}
+          style={[styles.input, styles.textArea, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
           placeholder="Any notes about this person..."
+          placeholderTextColor={t.textMuted}
           multiline
           value={notes}
           onChangeText={setNotes}
         />
       </View>
 
-      <Pressable style={styles.saveButton} onPress={handleSave}>
+      <Pressable style={[styles.saveButton, { backgroundColor: t.primary }]} onPress={handleSave}>
         <Text style={styles.saveButtonText}>Save Individual</Text>
       </Pressable>
     </ScrollView>
@@ -132,39 +137,18 @@ export default function AddIndividualScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: "#F8FAFC" },
-  title: { fontSize: 32, fontWeight: "700", marginTop: 40, color: "#0F172A" },
-  subtitle: { fontSize: 16, color: "#64748B", marginBottom: 4 },
+  container: { flex: 1, padding: 20 },
+  title: { fontSize: 32, fontWeight: "700", marginTop: 40 },
+  subtitle: { fontSize: 16, marginBottom: 4 },
   avatarSection: { alignItems: "center", paddingVertical: 28, gap: 10 },
   avatarImage: { width: 88, height: 88, borderRadius: 44 },
-  addPhotoButton: {
-    backgroundColor: "#EFF6FF",
-    borderWidth: 1,
-    borderColor: "#BFDBFE",
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  addPhotoText: { color: "#2563EB", fontSize: 14, fontWeight: "600" },
-  removePhotoText: { color: "#9CA3AF", fontSize: 13 },
+  addPhotoButton: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
+  addPhotoText: { fontSize: 14, fontWeight: "600" },
+  removePhotoText: { fontSize: 13 },
   formGroup: { marginBottom: 22 },
-  label: { fontSize: 16, fontWeight: "700", color: "#0F172A", marginBottom: 8 },
-  input: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 14,
-    padding: 16,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-  },
+  label: { fontSize: 16, fontWeight: "700", marginBottom: 8 },
+  input: { borderRadius: 14, padding: 16, fontSize: 16, borderWidth: 1 },
   textArea: { minHeight: 100, textAlignVertical: "top" },
-  saveButton: {
-    backgroundColor: "#2563EB",
-    padding: 18,
-    borderRadius: 16,
-    alignItems: "center",
-    marginTop: 10,
-    marginBottom: 40,
-  },
+  saveButton: { padding: 18, borderRadius: 16, alignItems: "center", marginTop: 10, marginBottom: 40 },
   saveButtonText: { color: "#FFFFFF", fontSize: 17, fontWeight: "700" },
 });

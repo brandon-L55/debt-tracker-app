@@ -6,7 +6,6 @@ import type { ThemeMode } from "@/context/ThemeContext";
 const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
   { value: "light", label: "Light" },
   { value: "dark", label: "Dark" },
-  { value: "system", label: "System" },
 ];
 
 type NavRow = { label: string; route: string; subtitle?: string };

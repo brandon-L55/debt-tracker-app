@@ -27,6 +27,8 @@ export type Group = {
   members: GroupMember[];
   imageUri?: string;
   createdAt: string;
+  pinned?: boolean;
+  silenced?: boolean;
 };
 
 export type Individual = {
@@ -37,6 +39,8 @@ export type Individual = {
   notes: string;
   imageUri?: string;
   createdAt: string;
+  pinned?: boolean;
+  silenced?: boolean;
 };
 
 const KEYS = {
@@ -56,6 +60,8 @@ type DebtContextType = {
   groups: Group[];
   addGroup: (group: Omit<Group, "id" | "createdAt">) => void;
   updateGroup: (id: string, updates: Partial<Omit<Group, "id" | "createdAt">>) => void;
+  deleteIndividual: (id: string) => void;
+  deleteGroup: (id: string) => void;
   individualOrder: string[];
   setIndividualOrder: (order: string[]) => void;
   groupOrder: string[];
@@ -171,6 +177,16 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     );
   }
 
+  function deleteIndividual(id: string) {
+    setIndividuals(prev => prev.filter(i => i.id !== id));
+    setIndividualOrder(prev => prev.filter(oid => oid !== id));
+  }
+
+  function deleteGroup(id: string) {
+    setGroups(prev => prev.filter(g => g.id !== id));
+    setGroupOrder(prev => prev.filter(oid => oid !== id));
+  }
+
   function addGroup(group: Omit<Group, "id" | "createdAt">) {
     const newId = uid();
     setGroups(prev => [
@@ -214,8 +230,8 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   return (
     <DebtContext.Provider value={{
       debts, addDebt,
-      individuals, addIndividual, updateIndividual,
-      groups, addGroup, updateGroup,
+      individuals, addIndividual, updateIndividual, deleteIndividual,
+      groups, addGroup, updateGroup, deleteGroup,
       individualOrder, setIndividualOrder,
       groupOrder, setGroupOrder,
       reset,

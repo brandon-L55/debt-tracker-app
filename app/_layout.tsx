@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { DebtProvider, useDebts } from '@/context/DebtContext';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -16,19 +17,23 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
-        <DebtProvider>
-          <AppShell />
-        </DebtProvider>
+        <AuthProvider>
+          <DebtProvider>
+            <AppShell />
+          </DebtProvider>
+        </AuthProvider>
       </ThemeProvider>
     </GestureHandlerRootView>
   );
 }
 
 function AppShell() {
-  const { isLoading } = useDebts();
+  const { isLoading: debtsLoading } = useDebts();
+  const { isLoading: authLoading } = useAuth();
   const { isDark } = useTheme();
 
-  if (isLoading) {
+  // Wait for auth session to be resolved before rendering nav tree
+  if (authLoading || debtsLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: isDark ? '#0F172A' : '#F8FAFC' }}>
         <ActivityIndicator size="large" color="#2563EB" />
@@ -40,6 +45,7 @@ function AppShell() {
     <NavThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="auth" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         <Stack.Screen name="add-debt" options={{ title: 'Add New Debt' }} />
         <Stack.Screen name="add-individual" options={{ title: 'Add Individual' }} />

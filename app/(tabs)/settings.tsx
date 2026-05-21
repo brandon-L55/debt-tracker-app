@@ -1,7 +1,9 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
 import { useRouter } from "expo-router";
 import { useTheme } from "@/context/ThemeContext";
 import type { ThemeMode } from "@/context/ThemeContext";
+import { useAuth } from "@/context/AuthContext";
 
 const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
   { value: "light", label: "Light" },
@@ -20,6 +22,24 @@ const NAV_ROWS: NavRow[] = [
 export default function SettingsScreen() {
   const router = useRouter();
   const { colors: t, mode, setMode } = useTheme();
+  const { signOut, session } = useAuth();
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function handleSignOut() {
+    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Sign Out",
+        style: "destructive",
+        onPress: async () => {
+          setSigningOut(true);
+          await signOut();
+          setSigningOut(false);
+          router.replace("/auth/login");
+        },
+      },
+    ]);
+  }
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: t.bg }} contentContainerStyle={styles.content}>
@@ -71,6 +91,28 @@ export default function SettingsScreen() {
           </Pressable>
         ))}
       </View>
+
+      {/* Sign Out */}
+      {session ? (
+        <>
+          <Text style={[styles.sectionLabel, { color: t.textMuted }]}>SESSION</Text>
+          <View style={[styles.section, { backgroundColor: t.card, borderColor: t.border }]}>
+            <Pressable
+              style={[styles.rowLast, { borderBottomColor: t.border }]}
+              onPress={handleSignOut}
+              disabled={signingOut}
+            >
+              <Text style={[styles.rowLabel, { color: t.red }]}>
+                {signingOut ? "Signing Out…" : "Sign Out"}
+              </Text>
+              {signingOut
+                ? <ActivityIndicator size="small" color={t.red} />
+                : <Text style={[styles.chevron, { color: t.red }]}>›</Text>
+              }
+            </Pressable>
+          </View>
+        </>
+      ) : null}
 
       <Text style={[styles.footer, { color: t.textMuted }]}>
         All data is stored locally on this device.

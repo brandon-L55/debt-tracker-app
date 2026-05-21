@@ -1,12 +1,20 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useTheme } from '@/context/ThemeContext';
+import { useAuth } from '@/context/AuthContext';
 
 export default function TabLayout() {
   const { isDark } = useTheme();
+  const { session, isLoading } = useAuth();
+
+  // Auth not yet resolved — root layout handles the spinner
+  if (isLoading) return null;
+
+  // No session → redirect to auth flow
+  if (!session) return <Redirect href="/auth/login" />;
 
   return (
     <Tabs

@@ -11,16 +11,14 @@ import { Avatar } from "@/components/Avatar";
 import type { Individual, Debt } from "@/context/DebtContext";
 
 // "custom" = post-drag order; not shown in the sort menu
-type SortOption = "az" | "za" | "latest-debt" | "owed-to-me-high" | "owed-to-them-high" | "owed-to-me-low" | "owed-to-them-low" | "custom";
+type SortOption = "az" | "za" | "latest-debt" | "owed-to-me" | "owed-to-them" | "custom";
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "az", label: "Alphabetical" },
   { value: "za", label: "Reverse Alphabetical" },
-  { value: "latest-debt", label: "Latest debt" },
-  { value: "owed-to-me-high", label: "Highest owed to me" },
-  { value: "owed-to-them-high", label: "Highest owed to them" },
-  { value: "owed-to-me-low", label: "Lowest owed to me" },
-  { value: "owed-to-them-low", label: "Lowest owed to them" },
+  { value: "latest-debt", label: "Latest Debt" },
+  { value: "owed-to-me", label: "Highest Owed to Me" },
+  { value: "owed-to-them", label: "Highest Owed to Them" },
 ];
 
 function calcNetBalance(name: string, debts: Debt[]): number {
@@ -28,15 +26,6 @@ function calcNetBalance(name: string, debts: Debt[]): number {
     .reduce((s, d) => s + (d.direction === "them" ? d.amount : -d.amount), 0);
 }
 
-function calcOwedToMe(name: string, debts: Debt[]): number {
-  return debts.filter(d => d.person === name && d.direction === "them")
-    .reduce((s, d) => s + d.amount, 0);
-}
-
-function calcOwedToThem(name: string, debts: Debt[]): number {
-  return debts.filter(d => d.person === name && d.direction === "me")
-    .reduce((s, d) => s + d.amount, 0);
-}
 
 function latestDebtDate(name: string, debts: Debt[]): number {
   const matches = debts.filter(d => d.person === name);
@@ -107,10 +96,8 @@ export default function IndividualsScreen() {
         case "az": return (a.nickname || a.name).localeCompare(b.nickname || b.name);
         case "za": return (b.nickname || b.name).localeCompare(a.nickname || a.name);
         case "latest-debt": return latestDebtDate(b.name, debts) - latestDebtDate(a.name, debts);
-        case "owed-to-me-high": return calcOwedToMe(b.name, debts) - calcOwedToMe(a.name, debts);
-        case "owed-to-them-high": return calcOwedToThem(b.name, debts) - calcOwedToThem(a.name, debts);
-        case "owed-to-me-low": return calcOwedToMe(a.name, debts) - calcOwedToMe(b.name, debts);
-        case "owed-to-them-low": return calcOwedToThem(a.name, debts) - calcOwedToThem(b.name, debts);
+        case "owed-to-me": return calcNetBalance(b.name, debts) - calcNetBalance(a.name, debts);
+        case "owed-to-them": return calcNetBalance(a.name, debts) - calcNetBalance(b.name, debts);
         default: return 0;
       }
     });

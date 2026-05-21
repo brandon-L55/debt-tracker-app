@@ -11,13 +11,15 @@ import { Avatar } from "@/components/Avatar";
 import type { Group, Debt } from "@/context/DebtContext";
 
 // "custom" = post-drag order; not shown in the sort menu
-type SortOption = "az" | "za" | "latest-debt" | "members" | "custom";
+type SortOption = "az" | "za" | "latest-debt" | "owed-to-me" | "owed-to-them" | "members" | "custom";
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "az", label: "Alphabetical" },
   { value: "za", label: "Reverse Alphabetical" },
-  { value: "latest-debt", label: "Latest debt" },
-  { value: "members", label: "Member count" },
+  { value: "latest-debt", label: "Latest Debt" },
+  { value: "owed-to-me", label: "Highest Owed to Me" },
+  { value: "owed-to-them", label: "Highest Owed to Them" },
+  { value: "members", label: "Member Count: Highest to Lowest" },
 ];
 
 function latestGroupDebtDate(groupId: string, debts: Debt[]): number {
@@ -92,7 +94,12 @@ export default function GroupsScreen() {
         case "az": return a.name.localeCompare(b.name);
         case "za": return b.name.localeCompare(a.name);
         case "latest-debt": return latestGroupDebtDate(b.id, debts) - latestGroupDebtDate(a.id, debts);
-        case "members": return b.members.length - a.members.length;
+        case "owed-to-me": return calcGroupTotal(b.id, debts) - calcGroupTotal(a.id, debts);
+        case "owed-to-them": return calcGroupTotal(a.id, debts) - calcGroupTotal(b.id, debts);
+        case "members": {
+          const diff = b.members.length - a.members.length;
+          return diff !== 0 ? diff : a.name.localeCompare(b.name);
+        }
         default: return 0;
       }
     });

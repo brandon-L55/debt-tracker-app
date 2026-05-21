@@ -66,7 +66,7 @@ export function ContactsProvider({ children }: { children: ReactNode }) {
   async function addIndividual(individual: Omit<Individual, "id" | "createdAt">) {
     if (!session) throw new Error("Not authenticated");
     const sortOrder = individuals.length;
-    const created = await contactsService.createContact(individual, session.user.id, sortOrder);
+    const created = await contactsService.createContact(individual, sortOrder);
     setIndividuals(prev => [...prev, created]);
     setIndividualOrderState(prev => [...prev, created.id]);
   }

@@ -10,6 +10,9 @@ alter table public.contacts
   add column if not exists linked_user_id uuid references auth.users(id) on delete set null;
 
 alter table public.contacts
+  add column if not exists avatar_url    text;
+
+alter table public.contacts
   add column if not exists nickname      text;
 
 alter table public.contacts

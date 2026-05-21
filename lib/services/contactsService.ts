@@ -51,18 +51,20 @@ export async function getContacts(): Promise<Individual[]> {
 }
 
 /**
- * Insert a new contact row. owner_id must be the current user's id.
+ * Insert a new contact row.
+ * owner_id is resolved from the authenticated session — the caller never sets it.
  * Returns the created Individual (with server-generated id and created_at).
  */
 export async function createContact(
   individual: Omit<Individual, "id" | "createdAt">,
-  userId: string,
   sortOrder: number
 ): Promise<Individual> {
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) throw new Error("Not authenticated");
   const { data, error } = await supabase
     .from("contacts")
     .insert({
-      owner_id: userId,
+      owner_id: user.id,
       name: individual.name,
       nickname: individual.nickname || null,
       username: individual.phoneOrUsername || null,
@@ -74,7 +76,10 @@ export async function createContact(
     })
     .select()
     .single();
-  if (error) throw error;
+  if (error) {
+    console.error("CREATE CONTACT ERROR:", JSON.stringify(error, null, 2));
+    throw new Error(error.message ?? "Supabase insert failed");
+  }
   return rowToIndividual(data as ContactRow);
 }
 

@@ -63,7 +63,11 @@ export default function AddIndividualScreen() {
       });
       router.back();
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Could not save contact.";
+      const msg =
+        e instanceof Error
+          ? e.message
+          : (e as { message?: string })?.message ?? "Could not save contact.";
+      console.error("ADD INDIVIDUAL ERROR:", e);
       Alert.alert("Save failed", msg);
     } finally {
       setSaving(false);

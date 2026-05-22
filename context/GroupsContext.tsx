@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useAuth } from "./AuthContext";
 import { useDebts } from "./DebtContext";
+import { useContacts } from "./ContactsContext";
 import type { Group } from "./DebtContext";
 import * as groupService from "@/lib/services/groupService";
 
@@ -24,8 +25,10 @@ const GroupsContext = createContext<GroupsContextType | null>(null);
 
 export function GroupsProvider({ children }: { children: ReactNode }) {
   const { session, isLoading: authLoading } = useAuth();
-  // renameDebtPerson keeps local debts in sync when a group member's name changes.
   const { renameDebtPerson } = useDebts();
+  // addCachedIndividuals surfaces auto-created contacts in the Individuals tab immediately.
+  // Requires ContactsProvider to wrap GroupsProvider in the component tree.
+  const { addCachedIndividuals } = useContacts();
 
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupOrder, setGroupOrderState] = useState<string[]>([]);
@@ -65,7 +68,8 @@ export function GroupsProvider({ children }: { children: ReactNode }) {
   async function addGroup(group: Omit<Group, "id" | "createdAt">) {
     if (!session) throw new Error("Not authenticated");
     const sortOrder = groups.length;
-    const created = await groupService.createGroup(group, sortOrder);
+    const { group: created, newContacts } = await groupService.createGroup(group, sortOrder);
+    addCachedIndividuals(newContacts);
     setGroups(prev => [...prev, created]);
     setGroupOrderState(prev => [...prev, created.id]);
   }
@@ -85,8 +89,10 @@ export function GroupsProvider({ children }: { children: ReactNode }) {
     }
     // Optimistic local update.
     setGroups(prev => prev.map(g => g.id === id ? { ...g, ...updates } : g));
-    // Background Supabase sync.
-    groupService.updateGroup(id, updates).catch(e =>
+    // Background Supabase sync; surface any auto-created contacts immediately.
+    groupService.updateGroup(id, updates).then(newContacts => {
+      addCachedIndividuals(newContacts);
+    }).catch(e =>
       console.error("Failed to update group:", e)
     );
   }

@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import type { Individual } from "@/context/DebtContext";
+import { normalizePhone, isPhoneNumber } from "@/lib/phoneUtils";
 
 // Shape of a row returned from the contacts table.
 type ContactRow = {
@@ -108,6 +109,36 @@ export async function updateContact(
 export async function deleteContact(id: string): Promise<void> {
   const { error } = await supabase.from("contacts").delete().eq("id", id);
   if (error) throw error;
+}
+
+/**
+ * Find or create a contact by phone (primary) or exact username (fallback).
+ * - Phone values are normalized before matching (strips spaces/dashes/parens).
+ * - Username values are matched exactly as entered.
+ * Never duplicates: if a contact with the same phone/username exists, reuse it.
+ */
+export async function findOrCreateContact(
+  name: string,
+  phoneOrUsername: string,
+  sortOrder = 9999,
+): Promise<Individual> {
+  const val = phoneOrUsername.trim();
+  const stored = isPhoneNumber(val) ? normalizePhone(val) : val;
+
+  if (stored) {
+    const { data, error } = await supabase
+      .from("contacts")
+      .select("*")
+      .eq("username", stored)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (data) return rowToIndividual(data as ContactRow);
+  }
+
+  return createContact(
+    { name, nickname: "", phoneOrUsername: stored, notes: "", pinned: false, silenced: false },
+    sortOrder,
+  );
 }
 
 /**

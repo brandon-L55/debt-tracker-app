@@ -3,6 +3,7 @@ import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleShee
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useDebts } from "@/context/DebtContext";
 import { useGroups } from "@/context/GroupsContext";
+import { useContacts } from "@/context/ContactsContext";
 import { useTheme } from "@/context/ThemeContext";
 import { GradientButton } from "@/components/GradientButton";
 
@@ -30,6 +31,7 @@ export default function AddGroupDebtScreen() {
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
   const { addDebt } = useDebts();
   const { groups } = useGroups();
+  const { individuals } = useContacts();
   const { colors: t } = useTheme();
 
   const resolvedGroupId = Array.isArray(groupId) ? groupId[0] : groupId;
@@ -50,8 +52,10 @@ export default function AddGroupDebtScreen() {
     );
   }
 
-  function toggleMember(name: string) {
-    setSelected(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]);
+  // selected tracks member IDs (not names) so the debt can resolve the
+  // contact's canonical name via contactId, matching phone-number identity.
+  function toggleMember(id: string) {
+    setSelected(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   }
 
   function handleSave() {
@@ -65,7 +69,13 @@ export default function AddGroupDebtScreen() {
     }
 
     const perPersonAmount = splitEvenly ? parsedAmount / (selected.length + 1) : parsedAmount;
-    for (const person of selected) {
+    for (const memberId of selected) {
+      const member = group.members.find(m => m.id === memberId)!;
+      // Use the linked contact's canonical name so this debt appears in the
+      // Individual dashboard. Falls back to the member's display name.
+      const person = member.contactId
+        ? (individuals.find(i => i.id === member.contactId)?.name ?? member.name)
+        : member.name;
       addDebt({ person, amount: parseFloat(perPersonAmount.toFixed(2)), direction, reason: reason.trim(), groupId: resolvedGroupId, deadline: deadlineISO });
     }
     router.back();
@@ -86,12 +96,12 @@ export default function AddGroupDebtScreen() {
         <Text style={[styles.label, { color: t.text }]}>Who is involved?</Text>
         <View style={styles.chips}>
           {group.members.map(m => {
-            const sel = selected.includes(m.name);
+            const sel = selected.includes(m.id);
             return (
               <Pressable
                 key={m.id}
                 style={[styles.chip, { backgroundColor: sel ? t.primarySoft : t.card, borderColor: sel ? t.primary : t.border }]}
-                onPress={() => toggleMember(m.name)}
+                onPress={() => toggleMember(m.id)}
               >
                 <Text style={[styles.chipText, { color: sel ? t.primary : t.textSub }]}>{m.name}</Text>
               </Pressable>

@@ -20,6 +20,8 @@ export type GroupMember = {
   id: string;
   name: string;
   phoneOrUsername: string;
+  /** id of the linked Individual/contact (matched by normalized phone number). */
+  contactId?: string;
 };
 
 export type Group = {

@@ -16,6 +16,12 @@ type ContactsContextType = {
   individualOrder: string[];
   /** Optimistic: local order updates immediately; Supabase syncs in background. */
   setIndividualOrder: (order: string[]) => void;
+  /**
+   * Inject already-persisted contacts into local state without a DB round-trip.
+   * Skips any individual whose id is already present (no duplicates).
+   * Used by GroupsContext to surface auto-created contacts immediately.
+   */
+  addCachedIndividuals: (toAdd: Individual[]) => void;
   isLoading: boolean;
   contactsError: string | null;
 };
@@ -98,12 +104,19 @@ export function ContactsProvider({ children }: { children: ReactNode }) {
   }
 
   function setIndividualOrder(order: string[]) {
-    // Optimistic order update.
     setIndividualOrderState(order);
-    // Background Supabase sync.
     contactsService.reorderContacts(order).catch(e =>
       console.error("Failed to reorder contacts:", e)
     );
+  }
+
+  function addCachedIndividuals(toAdd: Individual[]) {
+    if (toAdd.length === 0) return;
+    setIndividuals(prev => {
+      const existingIds = new Set(prev.map(i => i.id));
+      const fresh = toAdd.filter(i => !existingIds.has(i.id));
+      return fresh.length > 0 ? [...prev, ...fresh] : prev;
+    });
   }
 
   return (
@@ -114,6 +127,7 @@ export function ContactsProvider({ children }: { children: ReactNode }) {
       deleteIndividual,
       individualOrder,
       setIndividualOrder,
+      addCachedIndividuals,
       isLoading,
       contactsError,
     }}>

@@ -96,18 +96,24 @@ export async function createGroup(
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError || !user) throw new Error("Must be logged in to create groups.");
 
-  // 1. Insert the group row.
+  const payload = {
+    owner_id: user.id,
+    name: group.name,
+    description: group.description || null,
+    image_url: group.imageUri || null,
+    sort_order: sortOrder,
+    pinned: group.pinned ?? false,
+    silenced: group.silenced ?? false,
+  };
+  // TODO: remove once RLS issue is confirmed resolved
+  if (__DEV__) {
+    console.log("AUTH USER:", user.id);
+    console.log("GROUP INSERT PAYLOAD:", payload);
+  }
+
   const { data: groupData, error: groupError } = await supabase
     .from("groups")
-    .insert({
-      owner_id: user.id,
-      name: group.name,
-      description: group.description || null,
-      image_url: group.imageUri || null,
-      sort_order: sortOrder,
-      pinned: group.pinned ?? false,
-      silenced: group.silenced ?? false,
-    })
+    .insert(payload)
     .select()
     .single();
 

@@ -1,0 +1,37 @@
+"filename", "language", "Dotenv", "TypeScript JSX", "MS SQL", "JSON", "TypeScript", "comment", "blank", "total"
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\.env", "Dotenv", 2, 0, 0, 0, 0, 0, 0, 2
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\(tabs)\_layout.tsx", "TypeScript JSX", 0, 4, 0, 0, 0, 2, 2, 8
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\(tabs)\groups.tsx", "TypeScript JSX", 0, 2, 0, 0, 0, 0, 0, 2
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\(tabs)\index.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 0, 2, 2
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\(tabs)\individuals.tsx", "TypeScript JSX", 0, 18, 0, 0, 0, 0, 2, 20
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\(tabs)\settings.tsx", "TypeScript JSX", 0, 39, 0, 0, 0, 1, 2, 42
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\_layout.tsx", "TypeScript JSX", 0, 13, 0, 0, 0, 2, 1, 16
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\add-group-debt.tsx", "TypeScript JSX", 0, 2, 0, 0, 0, 0, 0, 2
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\add-individual.tsx", "TypeScript JSX", 0, 13, 0, 0, 0, 0, 0, 13
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\auth\_layout.tsx", "TypeScript JSX", 0, 10, 0, 0, 0, 2, 5, 17
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\auth\login.tsx", "TypeScript JSX", 0, 187, 0, 0, 0, 5, 14, 206
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\auth\signup.tsx", "TypeScript JSX", 0, 253, 0, 0, 0, 6, 16, 275
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\create-group.tsx", "TypeScript JSX", 0, 13, 0, 0, 0, 0, 0, 13
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\group\[id].tsx", "TypeScript JSX", 0, 2, 0, 0, 0, 0, 0, 2
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\individual\[id].tsx", "TypeScript JSX", 0, 2, 0, 0, 0, 0, 0, 2
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\settings\account.tsx", "TypeScript JSX", 0, 4, 0, 0, 0, 0, 0, 4
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\context\AuthContext.tsx", "TypeScript JSX", 0, 50, 0, 0, 0, 2, 12, 64
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\context\ContactsContext.tsx", "TypeScript JSX", 0, 100, 0, 0, 0, 15, 15, 130
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\context\DebtContext.tsx", "TypeScript JSX", 0, -118, 0, 0, 0, 1, -9, -126
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\context\GroupsContext.tsx", "TypeScript JSX", 0, 105, 0, 0, 0, 10, 15, 130
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\lib\services\contactsService.ts", "TypeScript", 0, 0, 0, 0, 98, 21, 8, 127
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\lib\services\groupService.ts", "TypeScript", 0, 0, 0, 0, 162, 29, 25, 216
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\lib\storage.native.ts", "TypeScript", 0, 0, 0, 0, 2, 1, 2, 5
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\lib\storage.ts", "TypeScript", 0, 0, 0, 0, 4, 2, 1, 7
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\lib\supabase.ts", "TypeScript", 0, 0, 0, 0, 13, 0, 3, 16
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\package-lock.json", "JSON", 0, 0, 0, 107, 0, 0, 0, 107
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\package.json", "JSON", 0, 0, 0, 2, 0, 0, 0, 2
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\supabase\.temp\linked-project.json", "JSON", 0, 0, 0, 1, 0, 0, 0, 1
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\supabase\migrations\20260521000000_initial_schema.sql", "MS SQL", 0, 0, 258, 0, 0, 77, 77, 412
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\supabase\migrations\20260521000001_contacts_extra_columns.sql", "MS SQL", 0, 0, 18, 0, 0, 8, 10, 36
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\supabase\migrations\20260521000002_ensure_contacts_schema.sql", "MS SQL", 0, 0, 18, 0, 0, 7, 10, 35
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\supabase\migrations\20260521000003_groups_extra_columns.sql", "MS SQL", 0, 0, 26, 0, 0, 19, 13, 58
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\supabase\migrations\20260521000004_fix_rls_recursion.sql", "MS SQL", 0, 0, 29, 0, 0, 30, 14, 73
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\supabase\migrations\20260521000005_fix_groups_insert_policy.sql", "MS SQL", 0, 0, 4, 0, 0, 14, 4, 22
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\supabase\migrations\20260521000006_fix_groups_insert_rls.sql", "MS SQL", 0, 0, 8, 0, 0, 13, 3, 24
+"Total", "-", 2, 699, 361, 110, 279, 267, 247, 1965

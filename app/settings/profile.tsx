@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
@@ -48,7 +48,8 @@ export default function ProfileSettingsScreen() {
   }
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: t.bg }} contentContainerStyle={styles.content}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: t.bg }} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 110 : 20}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"} showsVerticalScrollIndicator={false}>
       {/* Avatar */}
       <View style={styles.avatarSection}>
         {profile.imageUri ? (
@@ -104,11 +105,12 @@ export default function ProfileSettingsScreen() {
         <Text style={styles.saveBtnText}>{saved ? "Saved ✓" : "Save Profile"}</Text>
       </Pressable>
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 24, paddingBottom: 48 },
+  content: { padding: 24, paddingBottom: 260, flexGrow: 1 },
   avatarSection: { alignItems: "center", marginBottom: 32 },
   avatarImg: { width: 88, height: 88, borderRadius: 44 },
   changePhotoBtn: { marginTop: 12, borderRadius: 10, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 8 },

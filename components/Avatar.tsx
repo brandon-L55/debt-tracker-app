@@ -1,6 +1,6 @@
 import { Image, StyleSheet, Text, View } from "react-native";
 
-const PALETTE = ["#2563EB", "#7C3AED", "#DB2777", "#D97706", "#16A34A", "#0891B2"];
+const PALETTE = ["#7C3AED", "#06D6A0", "#FF4ECD", "#FFD166", "#3B82F6", "#FF5A5F"];
 
 function colorFor(name: string): string {
   let h = 0;
@@ -38,7 +38,7 @@ export function Avatar({ name, imageUri, size = 48 }: Props) {
     <View
       style={[
         styles.circle,
-        { width: size, height: size, borderRadius: size / 2, backgroundColor: bg + "22", borderColor: bg + "55" },
+        { width: size, height: size, borderRadius: size / 2, backgroundColor: bg + "25", borderColor: bg + "60" },
       ]}
     >
       <Text style={[styles.initials, { fontSize: size * 0.36, color: bg }]}>{initials}</Text>
@@ -50,9 +50,9 @@ const styles = StyleSheet.create({
   circle: {
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1,
+    borderWidth: 1.5,
   },
   initials: {
-    fontWeight: "700",
+    fontWeight: "800",
   },
 });

@@ -1,0 +1,119 @@
+Date : 2026-05-21 20:37:39
+Directory : c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app
+Total : 66 files,  18319 codes, 326 comments, 655 blanks, all 19300 lines
+
+Languages
++--------------------+------------+------------+------------+------------+------------+
+| language           | files      | code       | comment    | blank      | total      |
++--------------------+------------+------------+------------+------------+------------+
+| JSON               |          3 |     13,162 |          0 |          2 |     13,164 |
+| TypeScript JSX     |         37 |      4,237 |         79 |        425 |      4,741 |
+| MS SQL             |          7 |        361 |        168 |        131 |        660 |
+| TypeScript         |          9 |        348 |         68 |         55 |        471 |
+| JavaScript         |          2 |         97 |         11 |         16 |        124 |
+| JSON with Comments |          4 |         78 |          0 |          3 |         81 |
+| Markdown           |          3 |         34 |          0 |         23 |         57 |
+| Dotenv             |          1 |          2 |          0 |          0 |          2 |
++--------------------+------------+------------+------------+------------+------------+
+
+Directories
++---------------------------------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                                                                      | files      | code       | comment    | blank      | total      |
++---------------------------------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                                                                         |         66 |     18,319 |        326 |        655 |     19,300 |
+| . (Files)                                                                                                                 |         10 |     13,278 |          1 |         29 |     13,308 |
+| .claude                                                                                                                   |          1 |          5 |          0 |          1 |          6 |
+| app                                                                                                                       |         22 |      3,444 |         35 |        305 |      3,784 |
+| app (Files)                                                                                                               |          8 |      1,153 |         12 |        108 |      1,273 |
+| app\(tabs)                                                                                                                |          5 |      1,027 |          9 |         84 |      1,120 |
+| app\auth                                                                                                                  |          3 |        450 |         13 |         35 |        498 |
+| app\group                                                                                                                 |          1 |        266 |          0 |         21 |        287 |
+| app\individual                                                                                                            |          1 |        219 |          0 |         17 |        236 |
+| app\settings                                                                                                              |          4 |        329 |          1 |         40 |        370 |
+| components                                                                                                                |         10 |        343 |         14 |         47 |        404 |
+| components (Files)                                                                                                        |          7 |        243 |          3 |         34 |        280 |
+| components\ui                                                                                                             |          3 |        100 |         11 |         13 |        124 |
+| constants                                                                                                                 |          1 |         41 |          8 |          5 |         54 |
+| context                                                                                                                   |          5 |        450 |         30 |         73 |        553 |
+| hooks                                                                                                                     |          3 |         28 |          7 |         11 |         46 |
+| lib                                                                                                                       |          5 |        279 |         53 |         39 |        371 |
+| lib (Files)                                                                                                               |          3 |         19 |          3 |          6 |         28 |
+| lib\services                                                                                                              |          2 |        260 |         50 |         33 |        343 |
+| scripts                                                                                                                   |          1 |         89 |         10 |         14 |        113 |
+| supabase                                                                                                                  |          8 |        362 |        168 |        131 |        661 |
+| supabase\.temp                                                                                                            |          1 |          1 |          0 |          0 |          1 |
+| supabase\migrations                                                                                                       |          7 |        361 |        168 |        131 |        660 |
++---------------------------------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++---------------------------------------------------------------------------------------------------------------------------+--------------------+------------+------------+------------+------------+
+| filename                                                                                                                  | language           | code       | comment    | blank      | total      |
++---------------------------------------------------------------------------------------------------------------------------+--------------------+------------+------------+------------+------------+
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\.claude\settings.json                                           | JSON with Comments |          5 |          0 |          1 |          6 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\.env                                                            | Dotenv             |          2 |          0 |          0 |          2 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\AGENTS.md                                                       | Markdown           |          2 |          0 |          2 |          4 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\CLAUDE.md                                                       | Markdown           |          1 |          0 |          1 |          2 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\README.md                                                       | Markdown           |         31 |          0 |         20 |         51 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app.json                                                        | JSON with Comments |         48 |          0 |          1 |         49 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\(tabs)\_layout.tsx                                          | TypeScript JSX     |         50 |          2 |          6 |         58 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\(tabs)\groups.tsx                                           | TypeScript JSX     |        309 |          2 |         23 |        334 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\(tabs)\index.tsx                                            | TypeScript JSX     |        220 |          0 |         17 |        237 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\(tabs)\individuals.tsx                                      | TypeScript JSX     |        319 |          2 |         26 |        347 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\(tabs)\settings.tsx                                         | TypeScript JSX     |        129 |          3 |         12 |        144 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\_layout.tsx                                                 | TypeScript JSX     |         67 |          2 |          8 |         77 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\add-debt.tsx                                                | TypeScript JSX     |        204 |          5 |         17 |        226 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\add-group-debt.tsx                                          | TypeScript JSX     |        196 |          5 |         19 |        220 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\add-individual.tsx                                          | TypeScript JSX     |        156 |          0 |         12 |        168 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\auth\_layout.tsx                                            | TypeScript JSX     |         10 |          2 |          5 |         17 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\auth\login.tsx                                              | TypeScript JSX     |        187 |          5 |         14 |        206 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\auth\signup.tsx                                             | TypeScript JSX     |        253 |          6 |         16 |        275 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\create-group.tsx                                            | TypeScript JSX     |        164 |          0 |         15 |        179 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\edit-group.tsx                                              | TypeScript JSX     |        195 |          0 |         19 |        214 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\edit-individual.tsx                                         | TypeScript JSX     |        145 |          0 |         14 |        159 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\group\[id].tsx                                              | TypeScript JSX     |        266 |          0 |         21 |        287 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\individual\[id].tsx                                         | TypeScript JSX     |        219 |          0 |         17 |        236 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\modal.tsx                                                   | TypeScript JSX     |         26 |          0 |          4 |         30 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\settings\account.tsx                                        | TypeScript JSX     |         95 |          0 |         10 |        105 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\settings\contacts.tsx                                       | TypeScript JSX     |         51 |          0 |          8 |         59 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\settings\payment-apps.tsx                                   | TypeScript JSX     |         76 |          0 |          8 |         84 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\settings\profile.tsx                                        | TypeScript JSX     |        107 |          1 |         14 |        122 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\components\Avatar.tsx                                           | TypeScript JSX     |         50 |          0 |          9 |         59 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\components\external-link.tsx                                    | TypeScript JSX     |         21 |          2 |          3 |         26 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\components\haptic-tab.tsx                                       | TypeScript JSX     |         16 |          1 |          2 |         19 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\components\hello-wave.tsx                                       | TypeScript JSX     |         18 |          0 |          2 |         20 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\components\parallax-scroll-view.tsx                             | TypeScript JSX     |         73 |          0 |          7 |         80 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\components\themed-text.tsx                                      | TypeScript JSX     |         55 |          0 |          6 |         61 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\components\themed-view.tsx                                      | TypeScript JSX     |         10 |          0 |          5 |         15 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\components\ui\collapsible.tsx                                   | TypeScript JSX     |         40 |          0 |          6 |         46 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\components\ui\icon-symbol.ios.tsx                               | TypeScript JSX     |         31 |          0 |          2 |         33 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\components\ui\icon-symbol.tsx                                   | TypeScript JSX     |         29 |         11 |          5 |         45 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\constants\theme.ts                                              | TypeScript         |         41 |          8 |          5 |         54 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\context\AuthContext.tsx                                         | TypeScript JSX     |         50 |          2 |         12 |         64 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\context\ContactsContext.tsx                                     | TypeScript JSX     |        100 |         15 |         15 |        130 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\context\DebtContext.tsx                                         | TypeScript JSX     |        104 |          3 |         17 |        124 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\context\GroupsContext.tsx                                       | TypeScript JSX     |        105 |         10 |         15 |        130 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\context\ThemeContext.tsx                                        | TypeScript JSX     |         91 |          0 |         14 |        105 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app.code-workspace                                 | JSON with Comments |          8 |          0 |          0 |          8 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\eslint.config.js                                                | JavaScript         |          8 |          1 |          2 |         11 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\hooks\use-color-scheme.ts                                       | TypeScript         |          1 |          0 |          1 |          2 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\hooks\use-color-scheme.web.ts                                   | TypeScript         |         13 |          3 |          6 |         22 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\hooks\use-theme-color.ts                                        | TypeScript         |         14 |          4 |          4 |         22 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\lib\services\contactsService.ts                                 | TypeScript         |         98 |         21 |          8 |        127 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\lib\services\groupService.ts                                    | TypeScript         |        162 |         29 |         25 |        216 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\lib\storage.native.ts                                           | TypeScript         |          2 |          1 |          2 |          5 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\lib\storage.ts                                                  | TypeScript         |          4 |          2 |          1 |          7 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\lib\supabase.ts                                                 | TypeScript         |         13 |          0 |          3 |         16 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\package-lock.json                                               | JSON               |     13,109 |          0 |          1 |     13,110 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\package.json                                                    | JSON               |         52 |          0 |          1 |         53 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\scripts\reset-project.js                                        | JavaScript         |         89 |         10 |         14 |        113 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\supabase\.temp\linked-project.json                              | JSON               |          1 |          0 |          0 |          1 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\supabase\migrations\20260521000000_initial_schema.sql           | MS SQL             |        258 |         77 |         77 |        412 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\supabase\migrations\20260521000001_contacts_extra_columns.sql   | MS SQL             |         18 |          8 |         10 |         36 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\supabase\migrations\20260521000002_ensure_contacts_schema.sql   | MS SQL             |         18 |          7 |         10 |         35 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\supabase\migrations\20260521000003_groups_extra_columns.sql     | MS SQL             |         26 |         19 |         13 |         58 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\supabase\migrations\20260521000004_fix_rls_recursion.sql        | MS SQL             |         29 |         30 |         14 |         73 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\supabase\migrations\20260521000005_fix_groups_insert_policy.sql | MS SQL             |          4 |         14 |          4 |         22 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\supabase\migrations\20260521000006_fix_groups_insert_rls.sql    | MS SQL             |          8 |         13 |          3 |         24 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\tsconfig.json                                                   | JSON with Comments |         17 |          0 |          1 |         18 |
+| Total                                                                                                                     |                    |     18,319 |        326 |        655 |     19,300 |
++---------------------------------------------------------------------------------------------------------------------------+--------------------+------------+------------+------------+------------+

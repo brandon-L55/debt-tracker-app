@@ -1,0 +1,30 @@
+"filename", "language", "JSON with Comments", "JavaScript", "Markdown", "JSON", "TypeScript", "TypeScript JSX", "comment", "blank", "total"
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\.claude\settings.json", "JSON with Comments", -5, 0, 0, 0, 0, 0, 0, -1, -6
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\AGENTS.md", "Markdown", 0, 0, -2, 0, 0, 0, 0, -2, -4
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\CLAUDE.md", "Markdown", 0, 0, -1, 0, 0, 0, 0, -1, -2
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\README.md", "Markdown", 0, 0, -31, 0, 0, 0, 0, -20, -51
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\app.json", "JSON with Comments", -48, 0, 0, 0, 0, 0, 0, -1, -49
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\app\(tabs)\_layout.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, -32, 0, -4, -36
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\app\(tabs)\explore.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, -109, 0, -4, -113
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\app\(tabs)\index.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, -94, 0, -5, -99
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\app\_layout.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, -20, 0, -5, -25
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\app\modal.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, -26, 0, -4, -30
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\components\external-link.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, -21, -2, -3, -26
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\components\haptic-tab.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, -16, -1, -2, -19
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\components\hello-wave.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, -18, 0, -2, -20
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\components\parallax-scroll-view.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, -73, 0, -7, -80
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\components\themed-text.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, -55, 0, -6, -61
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\components\themed-view.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, -10, 0, -5, -15
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\components\ui\collapsible.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, -40, 0, -6, -46
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\components\ui\icon-symbol.ios.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, -31, 0, -2, -33
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\components\ui\icon-symbol.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, -26, -11, -5, -42
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\constants\theme.ts", "TypeScript", 0, 0, 0, 0, -41, 0, -8, -5, -54
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\eslint.config.js", "JavaScript", 0, -8, 0, 0, 0, 0, -1, -2, -11
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\hooks\use-color-scheme.ts", "TypeScript", 0, 0, 0, 0, -1, 0, 0, -1, -2
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\hooks\use-color-scheme.web.ts", "TypeScript", 0, 0, 0, 0, -13, 0, -3, -6, -22
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\hooks\use-theme-color.ts", "TypeScript", 0, 0, 0, 0, -14, 0, -4, -4, -22
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\package-lock.json", "JSON", 0, 0, 0, -12967, 0, 0, 0, -1, -12968
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\package.json", "JSON", 0, 0, 0, -47, 0, 0, 0, -1, -48
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\scripts\reset-project.js", "JavaScript", 0, -89, 0, 0, 0, 0, -10, -14, -113
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\tsconfig.json", "JSON with Comments", -17, 0, 0, 0, 0, 0, 0, -1, -18
+"Total", "-", -70, -97, -34, -13014, -69, -571, -40, -120, -14015

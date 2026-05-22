@@ -1,0 +1,69 @@
+Date : 2026-05-21 04:18:34
+Directory : c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app
+Total : 28 files,  -13855 codes, -40 comments, -120 blanks, all -14015 lines
+
+Languages
++--------------------+------------+------------+------------+------------+------------+
+| language           | files      | code       | comment    | blank      | total      |
++--------------------+------------+------------+------------+------------+------------+
+| Markdown           |          3 |        -34 |          0 |        -23 |        -57 |
+| TypeScript         |          4 |        -69 |        -15 |        -16 |       -100 |
+| JSON with Comments |          3 |        -70 |          0 |         -3 |        -73 |
+| JavaScript         |          2 |        -97 |        -11 |        -16 |       -124 |
+| TypeScript JSX     |         14 |       -571 |        -14 |        -60 |       -645 |
+| JSON               |          2 |    -13,014 |          0 |         -2 |    -13,016 |
++--------------------+------------+------------+------------+------------+------------+
+
+Directories
++--------------------------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                                                               | files      | code       | comment    | blank      | total      |
++--------------------------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                                                                  |         28 |    -13,855 |        -40 |       -120 |    -14,015 |
+| debt-tracker-app-new                                                                                               |         28 |    -13,855 |        -40 |       -120 |    -14,015 |
+| debt-tracker-app-new (Files)                                                                                       |          8 |    -13,121 |         -1 |        -29 |    -13,151 |
+| debt-tracker-app-new\.claude                                                                                       |          1 |         -5 |          0 |         -1 |         -6 |
+| debt-tracker-app-new\app                                                                                           |          5 |       -281 |          0 |        -22 |       -303 |
+| debt-tracker-app-new\app (Files)                                                                                   |          2 |        -46 |          0 |         -9 |        -55 |
+| debt-tracker-app-new\app\(tabs)                                                                                    |          3 |       -235 |          0 |        -13 |       -248 |
+| debt-tracker-app-new\components                                                                                    |          9 |       -290 |        -14 |        -38 |       -342 |
+| debt-tracker-app-new\components (Files)                                                                            |          6 |       -193 |         -3 |        -25 |       -221 |
+| debt-tracker-app-new\components\ui                                                                                 |          3 |        -97 |        -11 |        -13 |       -121 |
+| debt-tracker-app-new\constants                                                                                     |          1 |        -41 |         -8 |         -5 |        -54 |
+| debt-tracker-app-new\hooks                                                                                         |          3 |        -28 |         -7 |        -11 |        -46 |
+| debt-tracker-app-new\scripts                                                                                       |          1 |        -89 |        -10 |        -14 |       -113 |
++--------------------------------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++--------------------------------------------------------------------------------------------------------------------+--------------------+------------+------------+------------+------------+
+| filename                                                                                                           | language           | code       | comment    | blank      | total      |
++--------------------------------------------------------------------------------------------------------------------+--------------------+------------+------------+------------+------------+
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\.claude\settings.json               | JSON with Comments |         -5 |          0 |         -1 |         -6 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\AGENTS.md                           | Markdown           |         -2 |          0 |         -2 |         -4 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\CLAUDE.md                           | Markdown           |         -1 |          0 |         -1 |         -2 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\README.md                           | Markdown           |        -31 |          0 |        -20 |        -51 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\app.json                            | JSON with Comments |        -48 |          0 |         -1 |        -49 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\app\(tabs)\_layout.tsx              | TypeScript JSX     |        -32 |          0 |         -4 |        -36 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\app\(tabs)\explore.tsx              | TypeScript JSX     |       -109 |          0 |         -4 |       -113 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\app\(tabs)\index.tsx                | TypeScript JSX     |        -94 |          0 |         -5 |        -99 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\app\_layout.tsx                     | TypeScript JSX     |        -20 |          0 |         -5 |        -25 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\app\modal.tsx                       | TypeScript JSX     |        -26 |          0 |         -4 |        -30 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\components\external-link.tsx        | TypeScript JSX     |        -21 |         -2 |         -3 |        -26 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\components\haptic-tab.tsx           | TypeScript JSX     |        -16 |         -1 |         -2 |        -19 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\components\hello-wave.tsx           | TypeScript JSX     |        -18 |          0 |         -2 |        -20 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\components\parallax-scroll-view.tsx | TypeScript JSX     |        -73 |          0 |         -7 |        -80 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\components\themed-text.tsx          | TypeScript JSX     |        -55 |          0 |         -6 |        -61 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\components\themed-view.tsx          | TypeScript JSX     |        -10 |          0 |         -5 |        -15 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\components\ui\collapsible.tsx       | TypeScript JSX     |        -40 |          0 |         -6 |        -46 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\components\ui\icon-symbol.ios.tsx   | TypeScript JSX     |        -31 |          0 |         -2 |        -33 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\components\ui\icon-symbol.tsx       | TypeScript JSX     |        -26 |        -11 |         -5 |        -42 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\constants\theme.ts                  | TypeScript         |        -41 |         -8 |         -5 |        -54 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\eslint.config.js                    | JavaScript         |         -8 |         -1 |         -2 |        -11 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\hooks\use-color-scheme.ts           | TypeScript         |         -1 |          0 |         -1 |         -2 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\hooks\use-color-scheme.web.ts       | TypeScript         |        -13 |         -3 |         -6 |        -22 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\hooks\use-theme-color.ts            | TypeScript         |        -14 |         -4 |         -4 |        -22 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\package-lock.json                   | JSON               |    -12,967 |          0 |         -1 |    -12,968 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\package.json                        | JSON               |        -47 |          0 |         -1 |        -48 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\scripts\reset-project.js            | JavaScript         |        -89 |        -10 |        -14 |       -113 |
+| c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app-new\tsconfig.json                       | JSON with Comments |        -17 |          0 |         -1 |        -18 |
+| Total                                                                                                              |                    |    -13,855 |        -40 |       -120 |    -14,015 |
++--------------------------------------------------------------------------------------------------------------------+--------------------+------------+------------+------------+------------+

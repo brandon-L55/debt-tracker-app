@@ -6,6 +6,7 @@ export type ThemeMode = "light" | "dark";
 export type ThemeColors = {
   bg: string;
   card: string;
+  elevatedCard: string;
   input: string;
   text: string;
   textSub: string;
@@ -14,50 +15,58 @@ export type ThemeColors = {
   primary: string;
   primarySoft: string;
   primaryBorder: string;
+  accentPink: string;
   green: string;
   greenSoft: string;
   greenBorder: string;
   red: string;
   redSoft: string;
   redBorder: string;
+  warning: string;
 };
 
 const light: ThemeColors = {
-  bg: "#F8FAFC",
+  bg: "#F6F3FF",
   card: "#FFFFFF",
+  elevatedCard: "#EFE9FF",
   input: "#FFFFFF",
   text: "#111827",
-  textSub: "#6B7280",
-  textMuted: "#9CA3AF",
-  border: "#E2E8F0",
-  primary: "#2563EB",
-  primarySoft: "#EFF6FF",
-  primaryBorder: "#BFDBFE",
-  green: "#16A34A",
-  greenSoft: "#F0FDF4",
-  greenBorder: "#BBF7D0",
-  red: "#DC2626",
+  textSub: "#64748B",
+  textMuted: "#94A3B8",
+  border: "#DDD6FE",
+  primary: "#7C3AED",
+  primarySoft: "#F3EFFF",
+  primaryBorder: "#C4B5FD",
+  accentPink: "#EC4899",
+  green: "#00A884",
+  greenSoft: "#E6FAF6",
+  greenBorder: "#99E6D8",
+  red: "#EF4444",
   redSoft: "#FEF2F2",
   redBorder: "#FECACA",
+  warning: "#F59E0B",
 };
 
 const dark: ThemeColors = {
-  bg: "#0F172A",
-  card: "#1E293B",
-  input: "#334155",
-  text: "#F1F5F9",
-  textSub: "#94A3B8",
-  textMuted: "#64748B",
-  border: "#334155",
-  primary: "#3B82F6",
-  primarySoft: "#1E3A5F",
-  primaryBorder: "#2563EB",
-  green: "#22C55E",
-  greenSoft: "#052E16",
-  greenBorder: "#14532D",
-  red: "#EF4444",
-  redSoft: "#450A0A",
-  redBorder: "#7F1D1D",
+  bg: "#080B1A",
+  card: "#11162A",
+  elevatedCard: "#1A2038",
+  input: "#0F1528",
+  text: "#F8FAFC",
+  textSub: "#A8B3CF",
+  textMuted: "#6F7A96",
+  border: "#2A3152",
+  primary: "#7C3AED",
+  primarySoft: "#1C1040",
+  primaryBorder: "#3D2A7A",
+  accentPink: "#FF4ECD",
+  green: "#06D6A0",
+  greenSoft: "#032A20",
+  greenBorder: "#065C45",
+  red: "#FF5A5F",
+  redSoft: "#2A0F10",
+  redBorder: "#5A1518",
+  warning: "#FFD166",
 };
 
 type ThemeCtx = {

@@ -3,6 +3,8 @@ import { useState } from "react";
 import {
   Alert,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,12 +16,13 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useContacts } from "@/context/ContactsContext";
 import { useTheme } from "@/context/ThemeContext";
 import { Avatar } from "@/components/Avatar";
+import { GradientButton } from "@/components/GradientButton";
 
 export default function EditIndividualScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { individuals, updateIndividual } = useContacts();
-  const { colors: t } = useTheme();
+  const { colors: t, isDark } = useTheme();
 
   const resolvedId = Array.isArray(id) ? id[0] : id;
   const person = individuals.find(ind => ind.id === resolvedId);
@@ -71,13 +74,20 @@ export default function EditIndividualScreen() {
   }
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: t.bg }]} keyboardShouldPersistTaps="handled">
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: t.bg }} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 110 : 20}>
+      <ScrollView style={[styles.container, { backgroundColor: t.bg }]} contentContainerStyle={{ flexGrow: 1, padding: 20, paddingBottom: 260 }} keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"} showsVerticalScrollIndicator={false}>
       <View style={styles.avatarSection}>
-        {imageUri ? (
-          <Image source={{ uri: imageUri }} style={styles.avatarImage} />
-        ) : (
-          <Avatar name={name || person.name} size={88} />
-        )}
+        <View style={[styles.avatarRing, {
+          borderColor: isDark ? "#7C3AED" : "#C4B5FD",
+          backgroundColor: isDark ? "#1C1040" : "#F3EFFF",
+          ...(isDark ? { shadowColor: "#7C3AED", shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.4, shadowRadius: 16 } : {}),
+        }]}>
+          {imageUri ? (
+            <Image source={{ uri: imageUri }} style={styles.avatarImage} />
+          ) : (
+            <Avatar name={name || person.name} size={80} />
+          )}
+        </View>
         <Pressable style={[styles.changePhotoButton, { backgroundColor: t.primarySoft, borderColor: t.primaryBorder }]} onPress={pickImage}>
           <Text style={[styles.changePhotoText, { color: t.primary }]}>Change Photo</Text>
         </Pressable>
@@ -134,25 +144,27 @@ export default function EditIndividualScreen() {
         />
       </View>
 
-      <Pressable style={[styles.saveButton, { backgroundColor: t.primary }]} onPress={handleSave}>
-        <Text style={styles.saveButtonText}>Save Changes</Text>
-      </Pressable>
+      <GradientButton
+        label="Save Changes"
+        onPress={handleSave}
+        style={{ marginTop: 10, marginBottom: 40 }}
+      />
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20 },
+  container: { flex: 1 },
   notFound: { flex: 1, justifyContent: "center", alignItems: "center" },
-  avatarSection: { alignItems: "center", paddingVertical: 28, gap: 10 },
-  avatarImage: { width: 88, height: 88, borderRadius: 44 },
-  changePhotoButton: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
+  avatarSection: { alignItems: "center", paddingVertical: 28, gap: 12 },
+  avatarRing: { width: 100, height: 100, borderRadius: 50, borderWidth: 2, justifyContent: "center", alignItems: "center" },
+  avatarImage: { width: 92, height: 92, borderRadius: 46 },
+  changePhotoButton: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 18, paddingVertical: 8 },
   changePhotoText: { fontSize: 14, fontWeight: "600" },
   removePhotoText: { fontSize: 13 },
-  formGroup: { marginBottom: 22 },
-  label: { fontSize: 16, fontWeight: "700", marginBottom: 8 },
-  input: { borderRadius: 14, padding: 16, fontSize: 16, borderWidth: 1 },
+  formGroup: { marginBottom: 20 },
+  label: { fontSize: 15, fontWeight: "700", marginBottom: 8 },
+  input: { borderRadius: 16, padding: 16, fontSize: 16, borderWidth: 1 },
   textArea: { minHeight: 100, textAlignVertical: "top" },
-  saveButton: { padding: 18, borderRadius: 16, alignItems: "center", marginTop: 10, marginBottom: 40 },
-  saveButtonText: { color: "#FFFFFF", fontSize: 17, fontWeight: "700" },
 });

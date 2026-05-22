@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useDebts } from "@/context/DebtContext";
 import { useGroups } from "@/context/GroupsContext";
 import { useTheme } from "@/context/ThemeContext";
+import { GradientButton } from "@/components/GradientButton";
 
 function parseDeadlineInput(input: string): string | null {
   const trimmed = input.trim();
@@ -75,7 +76,8 @@ export default function AddGroupDebtScreen() {
   const deadlinePreview = previewDeadline(deadline);
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: t.bg }} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: t.bg }} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 110 : 20}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"} showsVerticalScrollIndicator={false}>
       <Text style={[styles.title, { color: t.text }]}>Add Group Debt</Text>
       <Text style={[styles.subtitle, { color: t.textSub }]}>{group.name}</Text>
 
@@ -181,15 +183,18 @@ export default function AddGroupDebtScreen() {
         {deadlinePreview ? <Text style={[styles.dlPreview, { color: t.primary }]}>📅 {deadlinePreview}</Text> : null}
       </View>
 
-      <Pressable style={[styles.saveBtn, { backgroundColor: t.primary }]} onPress={handleSave}>
-        <Text style={styles.saveBtnText}>Save Debt</Text>
-      </Pressable>
+      <GradientButton
+        label="Save Debt"
+        onPress={handleSave}
+        style={{ marginTop: 10, marginBottom: 40 }}
+      />
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 20, paddingBottom: 48 },
+  content: { padding: 20, paddingBottom: 260, flexGrow: 1 },
   title: { fontSize: 32, fontWeight: "700", marginTop: 40 },
   subtitle: { fontSize: 16, marginBottom: 28 },
   formGroup: { marginBottom: 22 },
@@ -214,6 +219,4 @@ const styles = StyleSheet.create({
   clearBtn: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 },
   clearBtnText: { fontSize: 14, fontWeight: "600" },
   dlPreview: { fontSize: 13, marginTop: 6, fontWeight: "500" },
-  saveBtn: { padding: 18, borderRadius: 16, alignItems: "center", marginTop: 10, marginBottom: 40 },
-  saveBtnText: { color: "#FFFFFF", fontSize: 17, fontWeight: "700" },
 });

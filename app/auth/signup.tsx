@@ -88,6 +88,7 @@ export default function SignupScreen() {
       <ScrollView
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
         <Text style={[styles.title, { color: t.text }]}>Create account</Text>
         <Text style={[styles.subtitle, { color: t.textSub }]}>

@@ -9,9 +9,9 @@ import { useDebts } from "@/context/DebtContext";
 import { useGroups } from "@/context/GroupsContext";
 import { useTheme } from "@/context/ThemeContext";
 import { Avatar } from "@/components/Avatar";
+import { GradientButton } from "@/components/GradientButton";
 import type { Group, Debt } from "@/context/DebtContext";
 
-// "custom" = post-drag order; not shown in the sort menu
 type SortOption = "az" | "za" | "latest-debt" | "owed-to-me" | "owed-to-them" | "members" | "custom";
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
@@ -38,7 +38,7 @@ export default function GroupsScreen() {
   const router = useRouter();
   const { debts } = useDebts();
   const { groups, groupOrder, setGroupOrder, updateGroup, deleteGroup } = useGroups();
-  const { colors: t } = useTheme();
+  const { colors: t, isDark } = useTheme();
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortOption>("latest-debt");
   const [showSortMenu, setShowSortMenu] = useState(false);
@@ -114,13 +114,13 @@ export default function GroupsScreen() {
     const total = calcGroupTotal(item.id, debts);
     const totalLabel = total === 0 ? "$0.00"
       : total > 0 ? `+$${total.toFixed(2)}` : `-$${Math.abs(total).toFixed(2)}`;
-    const totalColor = total > 0 ? t.green : total < 0 ? t.red : t.textSub;
+    const totalColor = total > 0 ? t.green : total < 0 ? t.red : t.textMuted;
 
     function renderRightActions() {
       return (
         <View style={styles.swipeActions}>
           <Pressable
-            style={[styles.swipeAction, { backgroundColor: t.border }]}
+            style={[styles.swipeAction, { backgroundColor: t.elevatedCard }]}
             onPress={() => updateGroup(item.id, { silenced: !item.silenced })}
           >
             <Text style={styles.swipeActionIcon}>{item.silenced ? "🔔" : "🔕"}</Text>
@@ -176,7 +176,11 @@ export default function GroupsScreen() {
           <Pressable
             style={({ pressed }) => [
               styles.card,
-              { backgroundColor: isActive ? t.primarySoft : t.card, borderColor: isActive ? t.primaryBorder : t.border },
+              {
+                backgroundColor: isActive ? t.primarySoft : t.card,
+                borderColor: isActive ? t.primaryBorder : t.border,
+                ...(isDark ? { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 6, elevation: 3 } : {}),
+              },
               pressed && { opacity: 0.85 },
             ]}
             onPress={() => router.push(`/group/${item.id}` as any)}
@@ -209,15 +213,17 @@ export default function GroupsScreen() {
         </ReanimatedSwipeable>
       </ScaleDecorator>
     );
-  }, [debts, router, t, updateGroup, deleteGroup]);
+  }, [debts, router, t, isDark, updateGroup, deleteGroup]);
 
   const listHeader = (
     <View>
       <Text style={[styles.title, { color: t.text }]}>Groups</Text>
       <Text style={[styles.subtitle, { color: t.textSub }]}>Trip, event, and friend groups will appear here.</Text>
-      <Pressable style={[styles.addBtn, { backgroundColor: t.primary }]} onPress={() => router.push("/create-group")}>
-        <Text style={styles.addBtnText}>+ Create Group</Text>
-      </Pressable>
+      <GradientButton
+        label="+ Create Group"
+        onPress={() => router.push("/create-group")}
+        style={{ marginBottom: 16 }}
+      />
       <View style={styles.searchRow}>
         <TextInput
           style={[styles.searchInput, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
@@ -235,11 +241,11 @@ export default function GroupsScreen() {
           }]}
           onPress={() => setShowSortMenu(true)}
         >
-          <Text style={[styles.sortBtnIcon, { color: (sort !== "latest-debt" && sort !== "custom") ? t.primary : t.text }]}>⇅</Text>
+          <Text style={[styles.sortBtnIcon, { color: (sort !== "latest-debt" && sort !== "custom") ? t.primary : t.textSub }]}>⇅</Text>
         </Pressable>
       </View>
       {(sort !== "latest-debt" && sort !== "custom") && <Text style={[styles.sortHint, { color: t.textSub }]}>Sorted by: {activeSortLabel}</Text>}
-      <Text style={[styles.dragHint, { color: t.textMuted }]}>Long-press any card (three lines on left) to drag and reorder</Text>
+      <Text style={[styles.dragHint, { color: t.textMuted }]}>Long-press any card to drag and reorder</Text>
     </View>
   );
 
@@ -263,18 +269,31 @@ export default function GroupsScreen() {
         ListHeaderComponent={listHeader}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={[styles.emptyText, { color: t.textMuted }]}>
+            <View style={[styles.emptyIconCircle, {
+              backgroundColor: isDark ? "#1C1040" : "#F3EFFF",
+              borderColor: isDark ? "#3D2A7A" : "#DDD6FE",
+              ...(isDark
+                ? { shadowColor: "#7C3AED", shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.65, shadowRadius: 22 }
+                : { shadowColor: "#7C3AED", shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.18, shadowRadius: 14 }),
+            }]}>
+              <Text style={styles.emptyIcon}>👥</Text>
+            </View>
+            <Text style={[styles.emptyTitle, { color: t.text }]}>
               {groups.length === 0 ? "No groups yet." : "No results found."}
+            </Text>
+            <Text style={[styles.emptySubtitle, { color: t.textMuted }]}>
+              {groups.length === 0 ? "Organize debts for a trip, event, or friend group." : "Try a different search."}
             </Text>
           </View>
         }
         contentContainerStyle={styles.content}
-        ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+        keyboardDismissMode="on-drag"
+        ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
       />
 
       <Modal visible={showSortMenu} transparent animationType="fade" onRequestClose={() => setShowSortMenu(false)}>
         <Pressable style={styles.overlay} onPress={() => setShowSortMenu(false)}>
-          <Pressable style={[styles.menu, { backgroundColor: t.card }]} onPress={e => e.stopPropagation()}>
+          <Pressable style={[styles.menu, { backgroundColor: t.elevatedCard, borderColor: t.border, borderWidth: 1 }]} onPress={e => e.stopPropagation()}>
             <Text style={[styles.menuTitle, { color: t.textMuted }]}>Sort By</Text>
             {SORT_OPTIONS.map(opt => (
               <Pressable
@@ -295,19 +314,20 @@ export default function GroupsScreen() {
 
 const styles = StyleSheet.create({
   content: { padding: 24, paddingBottom: 48 },
-  title: { fontSize: 32, fontWeight: "700", marginTop: 60 },
-  subtitle: { fontSize: 16, marginTop: 8, marginBottom: 24 },
-  addBtn: { padding: 18, borderRadius: 16, alignItems: "center" },
-  addBtnText: { color: "#FFFFFF", fontSize: 17, fontWeight: "700" },
-  searchRow: { flexDirection: "row", alignItems: "center", marginTop: 16, gap: 8 },
-  searchInput: { flex: 1, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15 },
-  sortBtn: { width: 44, height: 44, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  title: { fontSize: 32, fontWeight: "800", marginTop: 60, letterSpacing: -0.5 },
+  subtitle: { fontSize: 15, marginTop: 6, marginBottom: 20 },
+  searchRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  searchInput: { flex: 1, borderRadius: 14, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 11, fontSize: 15 },
+  sortBtn: { width: 46, height: 46, borderRadius: 14, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   sortBtnIcon: { fontSize: 18 },
   sortHint: { fontSize: 12, marginTop: 6, marginLeft: 2 },
   dragHint: { fontSize: 11, marginTop: 4, marginLeft: 2, marginBottom: 16 },
-  empty: { marginTop: 48, alignItems: "center" },
-  emptyText: { fontSize: 16 },
-  card: { borderRadius: 16, padding: 16, borderWidth: 1 },
+  empty: { marginTop: 48, alignItems: "center", gap: 10 },
+  emptyIconCircle: { width: 80, height: 80, borderRadius: 40, borderWidth: 1, justifyContent: "center", alignItems: "center", marginBottom: 4 },
+  emptyIcon: { fontSize: 32 },
+  emptyTitle: { fontSize: 18, fontWeight: "700" },
+  emptySubtitle: { fontSize: 14, textAlign: "center", paddingHorizontal: 32 },
+  card: { borderRadius: 18, padding: 16, borderWidth: 1 },
   cardInner: { flexDirection: "row", alignItems: "center", gap: 12 },
   dragHandle: { paddingHorizontal: 2 },
   dragIcon: { fontSize: 16 },
@@ -318,16 +338,15 @@ const styles = StyleSheet.create({
   cardRight: { alignItems: "flex-end", gap: 2 },
   cardTotal: { fontSize: 15, fontWeight: "700" },
   chevron: { fontSize: 20 },
-  balanceBadge: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4 },
   cardNameRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   cardBadge: { fontSize: 12 },
   swipeActions: { flexDirection: "row" },
   swipeAction: { width: 54, justifyContent: "center", alignItems: "center" },
   swipeActionIcon: { fontSize: 20 },
-  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", alignItems: "center" },
-  menu: { borderRadius: 20, paddingVertical: 8, width: 280, shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 8 },
-  menuTitle: { fontSize: 12, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.8, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
-  menuRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, marginHorizontal: 8, borderRadius: 10 },
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },
+  menu: { borderRadius: 22, paddingVertical: 8, width: 280, shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 24, elevation: 10 },
+  menuTitle: { fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 1, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
+  menuRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, marginHorizontal: 8, borderRadius: 12 },
   menuRowText: { flex: 1, fontSize: 15 },
   menuCheck: { fontSize: 15, fontWeight: "700" },
 });

@@ -5,25 +5,25 @@ import { useTheme } from "@/context/ThemeContext";
 import type { ThemeMode } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
 
-const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
+const THEME_OPTIONS: { value: ThemeMode; label: string; icon: string }[] = [
+  { value: "light", label: "Light", icon: "☀️" },
+  { value: "dark", label: "Dark", icon: "🌙" },
 ];
 
-type NavRow = { label: string; route: string; subtitle?: string };
-
-const NAV_ROWS: NavRow[] = [
-  { label: "Profile", route: "/settings/profile", subtitle: "Name, photo, contact info" },
-  { label: "Payment Apps", route: "/settings/payment-apps", subtitle: "Venmo, Cash App, PayPal" },
-  { label: "Contacts Access", route: "/settings/contacts", subtitle: "Auto-match names from contacts" },
-  { label: "Account Settings", route: "/settings/account", subtitle: "Export, clear, or reset data" },
-];
+type NavRow = { label: string; route: string; subtitle?: string; icon: string; iconBg: string };
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { colors: t, mode, setMode } = useTheme();
+  const { colors: t, mode, setMode, isDark } = useTheme();
   const { signOut, session } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
+
+  const NAV_ROWS: NavRow[] = [
+    { label: "Profile", route: "/settings/profile", subtitle: "Name, photo, contact info", icon: "👤", iconBg: isDark ? "#1C1040" : "#F3EFFF" },
+    { label: "Payment Apps", route: "/settings/payment-apps", subtitle: "Venmo, Cash App, PayPal", icon: "💳", iconBg: isDark ? "#021A14" : "#E6FAF6" },
+    { label: "Contacts Access", route: "/settings/contacts", subtitle: "Auto-match names from contacts", icon: "📒", iconBg: isDark ? "#130A2E" : "#EFE9FF" },
+    { label: "Account Settings", route: "/settings/account", subtitle: "Export, clear, or reset data", icon: "⚙️", iconBg: isDark ? "#1A2038" : "#F6F3FF" },
+  ];
 
   async function handleSignOut() {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
@@ -41,36 +41,45 @@ export default function SettingsScreen() {
     ]);
   }
 
+  const btnShadow = isDark ? {
+    shadowColor: "#7C3AED",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 5,
+  } : {};
+
   return (
     <ScrollView style={{ flex: 1, backgroundColor: t.bg }} contentContainerStyle={styles.content}>
       <Text style={[styles.title, { color: t.text }]}>Settings</Text>
 
-      {/* App Preferences */}
       <Text style={[styles.sectionLabel, { color: t.textMuted }]}>APP PREFERENCES</Text>
       <View style={[styles.section, { backgroundColor: t.card, borderColor: t.border }]}>
-        <View style={[styles.themeRow, { borderBottomColor: t.border }]}>
+        <View style={styles.themeRow}>
           <Text style={[styles.rowLabel, { color: t.text }]}>Theme</Text>
-          <View style={styles.themeToggle}>
-            {THEME_OPTIONS.map(opt => (
-              <Pressable
-                key={opt.value}
-                style={[
-                  styles.themeOption,
-                  { borderColor: t.border },
-                  mode === opt.value && { backgroundColor: t.primary, borderColor: t.primary },
-                ]}
-                onPress={() => setMode(opt.value)}
-              >
-                <Text style={[styles.themeOptionText, { color: mode === opt.value ? "#FFFFFF" : t.textSub }]}>
-                  {opt.label}
-                </Text>
-              </Pressable>
-            ))}
+          <View style={[styles.segmentedControl, { backgroundColor: t.elevatedCard, borderColor: t.border }]}>
+            {THEME_OPTIONS.map(opt => {
+              const isActive = mode === opt.value;
+              return (
+                <Pressable
+                  key={opt.value}
+                  style={[
+                    styles.segment,
+                    isActive && [styles.segmentActive, { backgroundColor: t.primary }, btnShadow],
+                  ]}
+                  onPress={() => setMode(opt.value)}
+                >
+                  <Text style={styles.segmentIcon}>{opt.icon}</Text>
+                  <Text style={[styles.segmentText, { color: isActive ? "#FFFFFF" : t.textSub }]}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
         </View>
       </View>
 
-      {/* Navigation rows */}
       <Text style={[styles.sectionLabel, { color: t.textMuted }]}>ACCOUNT</Text>
       <View style={[styles.section, { backgroundColor: t.card, borderColor: t.border }]}>
         {NAV_ROWS.map((row, i) => (
@@ -83,6 +92,9 @@ export default function SettingsScreen() {
             ]}
             onPress={() => router.push(row.route as any)}
           >
+            <View style={[styles.rowIcon, { backgroundColor: row.iconBg }]}>
+              <Text style={styles.rowIconText}>{row.icon}</Text>
+            </View>
             <View style={styles.rowContent}>
               <Text style={[styles.rowLabel, { color: t.text }]}>{row.label}</Text>
               {row.subtitle && <Text style={[styles.rowSub, { color: t.textSub }]}>{row.subtitle}</Text>}
@@ -92,19 +104,23 @@ export default function SettingsScreen() {
         ))}
       </View>
 
-      {/* Sign Out */}
       {session ? (
         <>
           <Text style={[styles.sectionLabel, { color: t.textMuted }]}>SESSION</Text>
           <View style={[styles.section, { backgroundColor: t.card, borderColor: t.border }]}>
             <Pressable
-              style={[styles.rowLast, { borderBottomColor: t.border }]}
+              style={styles.rowLast}
               onPress={handleSignOut}
               disabled={signingOut}
             >
-              <Text style={[styles.rowLabel, { color: t.red }]}>
-                {signingOut ? "Signing Out…" : "Sign Out"}
-              </Text>
+              <View style={[styles.rowIcon, { backgroundColor: isDark ? "#2A0F10" : "#FEF2F2" }]}>
+                <Text style={styles.rowIconText}>🚪</Text>
+              </View>
+              <View style={styles.rowContent}>
+                <Text style={[styles.rowLabel, { color: t.red }]}>
+                  {signingOut ? "Signing Out…" : "Sign Out"}
+                </Text>
+              </View>
               {signingOut
                 ? <ActivityIndicator size="small" color={t.red} />
                 : <Text style={[styles.chevron, { color: t.red }]}>›</Text>
@@ -123,20 +139,21 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   content: { padding: 24, paddingBottom: 48 },
-  title: { fontSize: 32, fontWeight: "700", marginTop: 60, marginBottom: 28 },
-  sectionLabel: {
-    fontSize: 12, fontWeight: "600", textTransform: "uppercase",
-    letterSpacing: 0.6, marginBottom: 8, marginLeft: 4,
-  },
-  section: { borderRadius: 16, borderWidth: 1, overflow: "hidden", marginBottom: 24 },
-  themeRow: { borderBottomWidth: 0, padding: 16, gap: 12 },
-  themeToggle: { flexDirection: "row", gap: 8 },
-  themeOption: { flex: 1, borderRadius: 10, borderWidth: 1, paddingVertical: 8, alignItems: "center" },
-  themeOptionText: { fontSize: 13, fontWeight: "600" },
-  row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 14, paddingHorizontal: 20, borderBottomWidth: 1 },
-  rowLast: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 14, paddingHorizontal: 20 },
+  title: { fontSize: 32, fontWeight: "800", marginTop: 60, marginBottom: 28, letterSpacing: -0.5 },
+  sectionLabel: { fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8, marginLeft: 4 },
+  section: { borderRadius: 20, borderWidth: 1, overflow: "hidden", marginBottom: 24 },
+  themeRow: { padding: 16, gap: 12 },
+  segmentedControl: { flexDirection: "row", borderRadius: 14, borderWidth: 1, padding: 3, gap: 3 },
+  segment: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 11, paddingVertical: 8 },
+  segmentActive: { borderRadius: 11 },
+  segmentIcon: { fontSize: 14 },
+  segmentText: { fontSize: 14, fontWeight: "600" },
+  row: { flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, gap: 12 },
+  rowLast: { flexDirection: "row", alignItems: "center", paddingVertical: 14, paddingHorizontal: 16, gap: 12 },
+  rowIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: "center", alignItems: "center" },
+  rowIconText: { fontSize: 18 },
   rowContent: { flex: 1 },
-  rowLabel: { fontSize: 16 },
+  rowLabel: { fontSize: 16, fontWeight: "500" },
   rowSub: { fontSize: 12, marginTop: 2 },
   chevron: { fontSize: 22 },
   footer: { fontSize: 12, textAlign: "center", marginTop: 8 },

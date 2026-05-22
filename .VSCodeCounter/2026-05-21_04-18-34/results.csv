@@ -1,0 +1,48 @@
+"filename", "language", "JSON with Comments", "JSON", "Markdown", "JavaScript", "TypeScript", "TypeScript JSX", "comment", "blank", "total"
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\.claude\settings.json", "JSON with Comments", 5, 0, 0, 0, 0, 0, 0, 1, 6
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\AGENTS.md", "Markdown", 0, 0, 2, 0, 0, 0, 0, 2, 4
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\CLAUDE.md", "Markdown", 0, 0, 1, 0, 0, 0, 0, 1, 2
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\README.md", "Markdown", 0, 0, 31, 0, 0, 0, 0, 20, 51
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app.json", "JSON with Comments", 48, 0, 0, 0, 0, 0, 0, 1, 49
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\(tabs)\_layout.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 46, 0, 4, 50
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\(tabs)\groups.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 307, 2, 23, 332
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\(tabs)\index.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 220, 0, 15, 235
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\(tabs)\individuals.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 301, 2, 24, 327
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\(tabs)\settings.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 90, 2, 10, 102
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\_layout.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 54, 0, 7, 61
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\add-debt.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 204, 5, 17, 226
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\add-group-debt.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 194, 5, 19, 218
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\add-individual.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 143, 0, 12, 155
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\create-group.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 151, 0, 15, 166
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\edit-group.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 195, 0, 19, 214
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\edit-individual.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 145, 0, 14, 159
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\group\[id].tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 264, 0, 21, 285
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\individual\[id].tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 217, 0, 17, 234
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\modal.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 26, 0, 4, 30
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\settings\account.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 91, 0, 10, 101
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\settings\contacts.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 51, 0, 8, 59
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\settings\payment-apps.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 76, 0, 8, 84
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\app\settings\profile.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 107, 1, 14, 122
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\components\Avatar.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 50, 0, 9, 59
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\components\external-link.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 21, 2, 3, 26
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\components\haptic-tab.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 16, 1, 2, 19
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\components\hello-wave.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 18, 0, 2, 20
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\components\parallax-scroll-view.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 73, 0, 7, 80
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\components\themed-text.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 55, 0, 6, 61
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\components\themed-view.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 10, 0, 5, 15
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\components\ui\collapsible.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 40, 0, 6, 46
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\components\ui\icon-symbol.ios.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 31, 0, 2, 33
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\components\ui\icon-symbol.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 29, 11, 5, 45
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\constants\theme.ts", "TypeScript", 0, 0, 0, 0, 41, 0, 8, 5, 54
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\context\DebtContext.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 222, 2, 26, 250
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\context\ThemeContext.tsx", "TypeScript JSX", 0, 0, 0, 0, 0, 91, 0, 14, 105
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\debt-tracker-app.code-workspace", "JSON with Comments", 8, 0, 0, 0, 0, 0, 0, 0, 8
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\eslint.config.js", "JavaScript", 0, 0, 0, 8, 0, 0, 1, 2, 11
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\hooks\use-color-scheme.ts", "TypeScript", 0, 0, 0, 0, 1, 0, 0, 1, 2
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\hooks\use-color-scheme.web.ts", "TypeScript", 0, 0, 0, 0, 13, 0, 3, 6, 22
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\hooks\use-theme-color.ts", "TypeScript", 0, 0, 0, 0, 14, 0, 4, 4, 22
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\package-lock.json", "JSON", 0, 13002, 0, 0, 0, 0, 0, 1, 13003
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\package.json", "JSON", 0, 50, 0, 0, 0, 0, 0, 1, 51
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\scripts\reset-project.js", "JavaScript", 0, 0, 0, 89, 0, 0, 10, 14, 113
+"c:\Users\brand\OneDrive\Documents\GitHub\debt-tracker-app\tsconfig.json", "JSON with Comments", 17, 0, 0, 0, 0, 0, 0, 1, 18
+"Total", "-", 78, 13052, 34, 97, 69, 3538, 59, 408, 17335

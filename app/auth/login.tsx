@@ -56,6 +56,7 @@ export default function LoginScreen() {
       <ScrollView
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
         <Text style={[styles.title, { color: t.text }]}>Welcome back</Text>
         <Text style={[styles.subtitle, { color: t.textSub }]}>

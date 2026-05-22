@@ -1,10 +1,16 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { supabase } from "@/lib/supabase";
+import { getDebts, createDebt } from "@/lib/services/debtService";
+import type { CreateDebtInput } from "@/lib/services/debtService";
 
 export type Debt = {
   id: string;
   person: string;
+  /** Contact id of the counterpart (set by debtService). */
+  contactId?: string;
+  /** Auth user id of the counterpart when they have a real account. */
+  linkedUserId?: string;
   amount: number;
   direction: "them" | "me";
   reason: string;
@@ -47,10 +53,6 @@ export type Individual = {
   silenced?: boolean;
 };
 
-const KEYS = {
-  debts: "@debt_tracker/debts",
-} as const;
-
 type DebtContextType = {
   debts: Debt[];
   addDebt: (debt: Omit<Debt, "id" | "createdAt" | "status"> & { status?: Debt["status"] }) => void;
@@ -62,38 +64,54 @@ type DebtContextType = {
 
 const DebtContext = createContext<DebtContextType | null>(null);
 
-function uid() {
-  return Math.random().toString(36).slice(2);
-}
-
 export function DebtProvider({ children }: { children: ReactNode }) {
   const [debts, setDebts] = useState<Debt[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    async function load() {
+    async function loadDebts() {
       try {
-        const debtsJson = await AsyncStorage.getItem(KEYS.debts);
-        if (debtsJson) setDebts(JSON.parse(debtsJson));
+        setIsLoading(true);
+        const { debts: loaded } = await getDebts();
+        setDebts(loaded);
       } catch (e) {
-        console.error("Failed to load stored data:", e);
+        console.error("Failed to load debts:", e);
+        setDebts([]);
       } finally {
         setIsLoading(false);
       }
     }
-    load();
+
+    // Load on mount and whenever the auth session changes so direction is
+    // always computed relative to the currently signed-in user.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") {
+        loadDebts();
+      } else if (event === "SIGNED_OUT") {
+        setDebts([]);
+        setIsLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (isLoading) return;
-    AsyncStorage.setItem(KEYS.debts, JSON.stringify(debts)).catch(console.error);
-  }, [debts, isLoading]);
-
-  function addDebt(debt: Omit<Debt, "id" | "createdAt" | "status"> & { status?: Debt["status"] }) {
-    setDebts(prev => [
-      { ...debt, status: debt.status ?? "pending", id: uid(), createdAt: new Date().toISOString() },
-      ...prev,
-    ]);
+  function addDebt(input: Omit<Debt, "id" | "createdAt" | "status"> & { status?: Debt["status"] }) {
+    const debtInput: CreateDebtInput = {
+      person: input.person,
+      contactId: input.contactId,
+      amount: input.amount,
+      direction: input.direction,
+      reason: input.reason,
+      groupId: input.groupId,
+      deadline: input.deadline,
+      status: input.status,
+    };
+    // Fire-and-forget: prepend the server-returned debt (with correct id and
+    // direction calculated from the current user) once Supabase confirms.
+    createDebt(debtInput)
+      .then(created => setDebts(prev => [created, ...prev]))
+      .catch(err => console.error("Failed to save debt:", err));
   }
 
   function renameDebtPerson(oldName: string, newName: string) {

@@ -142,6 +142,74 @@ export async function findOrCreateContact(
 }
 
 /**
+ * Find or create a contact by email.
+ * - Normalises the email to trim().toLowerCase() before every comparison.
+ * - If the owner already has a contact with that email, returns it.
+ * - Looks up public.profiles by email to resolve a real linked_user_id.
+ * - Creates the contact (with linked_user_id when found) and returns it.
+ *
+ * Returns { id, linkedUserId } — enough for debtService to set
+ * borrower_user_id / payer_user_id on the debt row.
+ */
+export async function findOrCreateContactByEmail(
+  email: string,
+  displayName?: string,
+): Promise<{ id: string; linkedUserId: string | null }> {
+  const normalizedEmail = email.trim().toLowerCase();
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError || !user) throw new Error("Not authenticated");
+
+  // 1. Return existing contact for this owner + email (idempotent).
+  const { data: existing } = await supabase
+    .from("contacts")
+    .select("id, linked_user_id")
+    .eq("owner_id", user.id)
+    .eq("email", normalizedEmail)
+    .maybeSingle();
+
+  if (existing) {
+    const row = existing as { id: string; linked_user_id: string | null };
+    return { id: row.id, linkedUserId: row.linked_user_id ?? null };
+  }
+
+  // 2. Look up profiles by email to get real user_id (requires
+  //    migration 20260522000000_profiles_email to be applied).
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("email", normalizedEmail)
+    .maybeSingle();
+
+  const linkedUserId = (profile as { id: string } | null)?.id ?? null;
+
+  // 3. Create the contact; use displayName if provided, else the email itself.
+  const name = displayName?.trim() || normalizedEmail;
+
+  const { data: created, error: insertError } = await supabase
+    .from("contacts")
+    .insert({
+      owner_id: user.id,
+      name,
+      email: normalizedEmail,
+      linked_user_id: linkedUserId,
+      sort_order: 9999,
+      pinned: false,
+      silenced: false,
+    })
+    .select("id, linked_user_id")
+    .single();
+
+  if (insertError) throw new Error(insertError.message);
+
+  const newRow = created as { id: string; linked_user_id: string | null };
+  return { id: newRow.id, linkedUserId: newRow.linked_user_id ?? null };
+}
+
+/**
  * Update sort_order for a list of contacts given their new ordered IDs.
  * Runs updates in parallel — one per contact.
  */

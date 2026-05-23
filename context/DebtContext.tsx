@@ -84,10 +84,13 @@ export function DebtProvider({ children }: { children: ReactNode }) {
 
     // Load on mount and whenever the auth session changes so direction is
     // always computed relative to the currently signed-in user.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (
+        (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") &&
+        session?.user
+      ) {
         loadDebts();
-      } else if (event === "SIGNED_OUT") {
+      } else if (event === "SIGNED_OUT" || (event === "INITIAL_SESSION" && !session?.user)) {
         setDebts([]);
         setIsLoading(false);
       }

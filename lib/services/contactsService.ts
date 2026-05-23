@@ -183,12 +183,7 @@ export async function findOrCreateContactByEmail(
       .eq("email", normalizedEmail)
       .maybeSingle();
     const profileId = (profileEx as { id: string } | null)?.id ?? null;
-    console.log("[DEBUG] findOrCreateContactByEmail (existing) — normalizedEmail:", normalizedEmail,
-      "profileData:", profileEx, "profileError:", profileExErr?.message ?? null,
-      "linkedUserId:", profileId);
     if (!profileId) {
-      const { data: allP } = await supabase.from("profiles").select("id, email").limit(20);
-      console.log("[DEBUG] All profile emails in table:", JSON.stringify(allP));
       throw new Error("No account found for this email");
     }
     await supabase
@@ -206,12 +201,7 @@ export async function findOrCreateContactByEmail(
     .maybeSingle();
 
   const linkedUserId = (profile as { id: string } | null)?.id ?? null;
-  console.log("[DEBUG] findOrCreateContactByEmail (new) — normalizedEmail:", normalizedEmail,
-    "profileData:", profile, "profileError:", profileErr?.message ?? null,
-    "linkedUserId:", linkedUserId);
   if (!linkedUserId) {
-    const { data: allP } = await supabase.from("profiles").select("id, email").limit(20);
-    console.log("[DEBUG] All profile emails in table:", JSON.stringify(allP));
     throw new Error("No account found for this email");
   }
 

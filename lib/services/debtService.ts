@@ -128,8 +128,6 @@ async function resolvePersonForDebt(personInput: string): Promise<{
   linkedUserId: string | null;
 }> {
   const trimmed = personInput.trim();
-  console.log("[DEBUG] resolvePersonForDebt — entered input:", trimmed, "isEmail:", isEmail(trimmed));
-
   if (isEmail(trimmed)) {
     const contact = await findOrCreateContactByEmail(trimmed.toLowerCase());
     return {
@@ -323,17 +321,11 @@ export async function createDebt(input: CreateDebtInput): Promise<Debt> {
     if (linkedUserId) payload.payer_user_id = linkedUserId;
   }
 
-  console.log("[DEBUG] createDebt payload:", JSON.stringify(payload, null, 2));
-
   const { data, error } = await supabase
     .from("debts")
     .insert(payload)
     .select(SELECT_FIELDS)
     .single();
-
-  console.log("[DEBUG] createDebt result — error:", error?.message ?? null,
-    "payer_user_id:", (data as any)?.payer_user_id ?? null,
-    "borrower_user_id:", (data as any)?.borrower_user_id ?? null);
 
   if (error) {
     console.error("CREATE DEBT ERROR:", JSON.stringify(error, null, 2));

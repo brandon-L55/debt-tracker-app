@@ -5,9 +5,9 @@ import { ActivityIndicator, View } from 'react-native';
 import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
-import { DebtProvider, useDebts } from '@/context/DebtContext';
-import { ContactsProvider, useContacts } from '@/context/ContactsContext';
-import { GroupsProvider, useGroups } from '@/context/GroupsContext';
+import { DebtProvider } from '@/context/DebtContext';
+import { ContactsProvider } from '@/context/ContactsContext';
+import { GroupsProvider } from '@/context/GroupsContext';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 
@@ -36,14 +36,12 @@ export default function RootLayout() {
 }
 
 function AppShell() {
-  const { isLoading: debtsLoading } = useDebts();
   const { isLoading: authLoading } = useAuth();
-  const { isLoading: contactsLoading } = useContacts();
-  const { isLoading: groupsLoading } = useGroups();
   const { isDark } = useTheme();
 
-  // Wait for auth session and all data sources to resolve before rendering nav tree
-  if (authLoading || debtsLoading || contactsLoading || groupsLoading) {
+  // Wait only for auth session before mounting the navigator.
+  // Data loading (debts, contacts, groups) is handled by individual screens.
+  if (authLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: isDark ? '#0F172A' : '#F8FAFC' }}>
         <ActivityIndicator size="large" color="#2563EB" />

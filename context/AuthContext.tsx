@@ -27,7 +27,6 @@ function selfHealProfile(userId: string, rawEmail: string, label: string) {
     .upsert({ id: userId, email }, { onConflict: "id" })
     .then(({ error }) => {
       if (error) console.warn(`[WARN] profile self-heal upsert failure (${label}):`, error.message);
-      else console.log(`[DEBUG] profile self-heal upsert success (${label}):`, email);
     });
 }
 

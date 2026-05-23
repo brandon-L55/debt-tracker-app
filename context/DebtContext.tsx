@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import { getDebts, createDebt, updateDebtStatus as serviceUpdateDebtStatus, createPayment } from "@/lib/services/debtService";
@@ -81,20 +81,108 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   const [debts, setDebts] = useState<Debt[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const debtsRef = useRef<Debt[]>([]);
 
   useEffect(() => {
-    async function loadDebts() {
+    debtsRef.current = debts;
+  }, [debts]);
+
+  useEffect(() => {
+    let isMounted = true;
+    let refetchTimer: ReturnType<typeof setTimeout> | null = null;
+    let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
+    let subscribedUserId: string | null = null;
+    let isRefetching = false;
+    let queuedRefetch = false;
+
+    async function loadDebts(showLoading = true) {
       try {
-        setIsLoading(true);
+        if (showLoading) setIsLoading(true);
         const { debts: loaded, userId } = await getDebts();
+        if (!isMounted) return;
         setDebts(loaded);
         setCurrentUserId(userId);
       } catch (e) {
         console.error("Failed to load debts:", e);
-        setDebts([]);
+        if (showLoading) setDebts([]);
       } finally {
-        setIsLoading(false);
+        if (isMounted && showLoading) setIsLoading(false);
       }
+    }
+
+    async function refetchDebts() {
+      if (isRefetching) {
+        queuedRefetch = true;
+        return;
+      }
+
+      isRefetching = true;
+      await loadDebts(false);
+      isRefetching = false;
+
+      if (queuedRefetch) {
+        queuedRefetch = false;
+        refetchDebts();
+      }
+    }
+
+    function scheduleRefetch() {
+      if (refetchTimer) clearTimeout(refetchTimer);
+      refetchTimer = setTimeout(() => {
+        refetchTimer = null;
+        refetchDebts();
+      }, 250);
+    }
+
+    function paymentTouchesLoadedDebt(payload: { new?: { debt_id?: string }; old?: { debt_id?: string } }) {
+      const debtId = payload.new?.debt_id ?? payload.old?.debt_id;
+      if (!debtId) return true;
+      return debtsRef.current.some((debt) => debt.id === debtId);
+    }
+
+    function stopRealtime() {
+      if (refetchTimer) {
+        clearTimeout(refetchTimer);
+        refetchTimer = null;
+      }
+      if (realtimeChannel) {
+        supabase.removeChannel(realtimeChannel);
+        realtimeChannel = null;
+      }
+      subscribedUserId = null;
+      queuedRefetch = false;
+    }
+
+    function startRealtime(userId: string) {
+      if (subscribedUserId === userId && realtimeChannel) return;
+
+      stopRealtime();
+      subscribedUserId = userId;
+      realtimeChannel = supabase
+        .channel(`debt-sync:${userId}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "debts", filter: `creator_id=eq.${userId}` },
+          scheduleRefetch,
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "debts", filter: `payer_user_id=eq.${userId}` },
+          scheduleRefetch,
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "debts", filter: `borrower_user_id=eq.${userId}` },
+          scheduleRefetch,
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "payments" },
+          (payload) => {
+            if (paymentTouchesLoadedDebt(payload)) scheduleRefetch();
+          },
+        )
+        .subscribe();
     }
 
     // Load on mount and whenever the auth session changes so direction is
@@ -104,15 +192,21 @@ export function DebtProvider({ children }: { children: ReactNode }) {
         (event === "SIGNED_IN" || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") &&
         session?.user
       ) {
+        startRealtime(session.user.id);
         loadDebts();
       } else if (event === "SIGNED_OUT" || (event === "INITIAL_SESSION" && !session?.user)) {
+        stopRealtime();
         setDebts([]);
         setCurrentUserId(null);
         setIsLoading(false);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      stopRealtime();
+      subscription.unsubscribe();
+    };
   }, []);
 
   function addDebt(input: Omit<Debt, "id" | "createdAt" | "status" | "creatorId" | "remainingAmount"> & { status?: Debt["status"] }): Promise<void> {

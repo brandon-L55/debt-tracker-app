@@ -176,34 +176,32 @@ export async function findOrCreateContactByEmail(
     if (row.linked_user_id) {
       return { id: row.id, linkedUserId: row.linked_user_id };
     }
-    // Existing contact has no linked_user_id — look up profile and backfill.
-    const { data: profileEx, error: profileExErr } = await supabase
+    // Existing contact has no linked_user_id — look up profile and backfill if found.
+    const { data: profileEx } = await supabase
       .from("profiles")
       .select("id")
       .eq("email", normalizedEmail)
       .maybeSingle();
     const profileId = (profileEx as { id: string } | null)?.id ?? null;
-    if (!profileId) {
-      throw new Error("No account found for this email");
+    if (profileId) {
+      await supabase
+        .from("contacts")
+        .update({ linked_user_id: profileId })
+        .eq("id", row.id);
     }
-    await supabase
-      .from("contacts")
-      .update({ linked_user_id: profileId })
-      .eq("id", row.id);
     return { id: row.id, linkedUserId: profileId };
   }
 
-  // 2. Look up profiles by email to get real user_id.
-  const { data: profile, error: profileErr } = await supabase
+  // 2. Optionally look up profiles by email to resolve a real user_id.
+  //    If the email is not yet registered the contact is still created;
+  //    linked_user_id stays null until the other party signs up.
+  const { data: profile } = await supabase
     .from("profiles")
     .select("id")
     .eq("email", normalizedEmail)
     .maybeSingle();
 
   const linkedUserId = (profile as { id: string } | null)?.id ?? null;
-  if (!linkedUserId) {
-    throw new Error("No account found for this email");
-  }
 
   // 3. Create the contact; use displayName if provided, else the email itself.
   const name = displayName?.trim() || normalizedEmail;

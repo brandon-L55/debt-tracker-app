@@ -4,6 +4,7 @@ import { useAuth } from "./AuthContext";
 import { useDebts } from "./DebtContext";
 import type { Individual } from "./DebtContext";
 import * as contactsService from "@/lib/services/contactsService";
+import { supabase } from "@/lib/supabase";
 
 type ContactsContextType = {
   individuals: Individual[];
@@ -52,6 +53,33 @@ export function ContactsProvider({ children }: { children: ReactNode }) {
     loadContacts();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user.id, authLoading]);
+
+  // Realtime: reload the contact list whenever a new row is inserted for the
+  // current user.  Covers two paths:
+  //   (a) Creator side — findOrCreateContactByEmail just INSERTed a contact.
+  //   (b) Recipient side — create_mirror_contact RPC just INSERTed a mirror
+  //       contact so the sender appears in the recipient's Individuals tab.
+  useEffect(() => {
+    if (!session) return;
+
+    const uid = session.user.id;
+    const channel = supabase
+      .channel(`contacts-inserts-${uid}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "contacts",
+          filter: `owner_id=eq.${uid}`,
+        },
+        () => { loadContacts(); },
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user.id]);
 
   async function loadContacts() {
     setIsLoading(true);

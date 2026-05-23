@@ -61,6 +61,7 @@ function rowToDebt(row: DebtRow, currentUserId: string): DebtWithMeta {
 
   return {
     id: row.id,
+    creatorId: row.creator_id,
     person: contactRecord?.name ?? "",
     contactId: contactRecord?.id,
     linkedUserId: otherUserId ?? undefined,

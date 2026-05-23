@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useDebts } from "@/context/DebtContext";
 import { useContacts } from "@/context/ContactsContext";
@@ -74,11 +74,20 @@ function statusStyle(status: string) {
 export default function IndividualDashboardScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { debts } = useDebts();
+  const { debts, currentUserId, updateDebtStatus } = useDebts();
   const { individuals } = useContacts();
   const { colors: t } = useTheme();
   const [sort, setSort] = useState<DebtSortOption>("date");
   const [showSortMenu, setShowSortMenu] = useState(false);
+
+  async function handleAccept(debtId: string) {
+    try { await updateDebtStatus(debtId, "accepted"); }
+    catch (e: any) { Alert.alert("Error", e?.message ?? "Could not accept debt."); }
+  }
+  async function handleDecline(debtId: string) {
+    try { await updateDebtStatus(debtId, "rejected"); }
+    catch (e: any) { Alert.alert("Error", e?.message ?? "Could not decline debt."); }
+  }
 
   const td = today();
   const resolvedId = Array.isArray(id) ? id[0] : id;
@@ -93,8 +102,9 @@ export default function IndividualDashboardScreen() {
   }
 
   const personDebts = debts.filter(d => d.person === person.name);
-  const iOwe = personDebts.filter(d => d.direction === "me").reduce((s, d) => s + d.amount, 0);
-  const owedToMe = personDebts.filter(d => d.direction === "them").reduce((s, d) => s + d.amount, 0);
+  // Only accepted debts count toward per-person totals.
+  const iOwe = personDebts.filter(d => d.direction === "me" && d.status === "accepted").reduce((s, d) => s + d.amount, 0);
+  const owedToMe = personDebts.filter(d => d.direction === "them" && d.status === "accepted").reduce((s, d) => s + d.amount, 0);
   const displayDebts = useMemo(() => sortDebts(personDebts, sort, td), [debts, sort, person.name]);
   const activeSortLabel = DEBT_SORT_OPTIONS.find(o => o.value === sort)?.label ?? "";
 
@@ -154,25 +164,44 @@ export default function IndividualDashboardScreen() {
           </View>
         ) : displayDebts.map(debt => {
           const dl = dlInfo(debt.deadline, td);
+          const showActions = debt.status === "pending" && !!currentUserId && debt.creatorId !== currentUserId;
           return (
-            <View key={debt.id} style={[styles.txRow, { backgroundColor: t.card, borderColor: t.border }]}>
-              <View style={styles.txLeft}>
-                {debt.reason ? <Text style={[styles.txReason, { color: t.text }]}>{debt.reason}</Text>
-                  : <Text style={[styles.txReasonEmpty, { color: t.textMuted }]}>No reason</Text>}
-                <View style={styles.txMeta}>
-                  <Text style={[styles.txDate, { color: t.textMuted }]}>{new Date(debt.createdAt).toLocaleDateString()}</Text>
-                  <View style={[styles.statusBadge, statusStyle(debt.status)]}>
-                    <Text style={styles.statusText}>{debt.status}</Text>
+            <View key={debt.id} style={[styles.txRow, { backgroundColor: t.card, borderColor: showActions ? t.primaryBorder : t.border }]}>
+              <View style={styles.txRowContent}>
+                <View style={styles.txLeft}>
+                  {debt.reason ? <Text style={[styles.txReason, { color: t.text }]}>{debt.reason}</Text>
+                    : <Text style={[styles.txReasonEmpty, { color: t.textMuted }]}>No reason</Text>}
+                  <View style={styles.txMeta}>
+                    <Text style={[styles.txDate, { color: t.textMuted }]}>{new Date(debt.createdAt).toLocaleDateString()}</Text>
+                    <View style={[styles.statusBadge, statusStyle(debt.status)]}>
+                      <Text style={styles.statusText}>{debt.status}</Text>
+                    </View>
                   </View>
+                  {dl ? <Text style={[styles.dlLabel, { color: dl.overdue ? t.red : t.primary }]}>{dl.label}{dl.overdue ? " · Overdue" : ""}</Text> : null}
                 </View>
-                {dl ? <Text style={[styles.dlLabel, { color: dl.overdue ? t.red : t.primary }]}>{dl.label}{dl.overdue ? " · Overdue" : ""}</Text> : null}
+                <View style={styles.txRight}>
+                  <Text style={[styles.txAmount, { color: debt.direction === "me" ? t.red : t.green }]}>
+                    {debt.direction === "me" ? "-" : "+"}${debt.amount.toFixed(2)}
+                  </Text>
+                  <Text style={[styles.txDir, { color: t.textSub }]}>{debt.direction === "me" ? "You owe" : "Owes you"}</Text>
+                </View>
               </View>
-              <View style={styles.txRight}>
-                <Text style={[styles.txAmount, { color: debt.direction === "me" ? t.red : t.green }]}>
-                  {debt.direction === "me" ? "-" : "+"}${debt.amount.toFixed(2)}
-                </Text>
-                <Text style={[styles.txDir, { color: t.textSub }]}>{debt.direction === "me" ? "You owe" : "Owes you"}</Text>
-              </View>
+              {showActions && (
+                <View style={styles.txActionRow}>
+                  <Pressable
+                    style={[styles.txActionBtn, { backgroundColor: t.greenSoft, borderColor: t.greenBorder }]}
+                    onPress={() => handleAccept(debt.id)}
+                  >
+                    <Text style={[styles.txActionText, { color: t.green }]}>✓ Accept</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.txActionBtn, { backgroundColor: t.redSoft, borderColor: t.redBorder }]}
+                    onPress={() => handleDecline(debt.id)}
+                  >
+                    <Text style={[styles.txActionText, { color: t.red }]}>✗ Decline</Text>
+                  </Pressable>
+                </View>
+              )}
             </View>
           );
         })}
@@ -214,7 +243,8 @@ const styles = StyleSheet.create({
   sortHint: { fontSize: 12, marginBottom: 10 },
   emptyBox: { borderRadius: 14, padding: 20, alignItems: "center", borderWidth: 1 },
   emptyText: { fontSize: 14, textAlign: "center", fontStyle: "italic", lineHeight: 22 },
-  txRow: { borderRadius: 14, padding: 16, marginBottom: 10, borderWidth: 1, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  txRow: { borderRadius: 14, padding: 16, marginBottom: 10, borderWidth: 1 },
+  txRowContent: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   txLeft: { flex: 1, marginRight: 12 },
   txReason: { fontSize: 15, fontWeight: "600" },
   txReasonEmpty: { fontSize: 15, fontStyle: "italic" },
@@ -226,6 +256,9 @@ const styles = StyleSheet.create({
   txRight: { alignItems: "flex-end" },
   txAmount: { fontSize: 17, fontWeight: "700" },
   txDir: { fontSize: 12, marginTop: 2 },
+  txActionRow: { flexDirection: "row", gap: 8, marginTop: 12 },
+  txActionBtn: { flex: 1, borderRadius: 10, borderWidth: 1, paddingVertical: 8, alignItems: "center" },
+  txActionText: { fontSize: 13, fontWeight: "700" },
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", alignItems: "center" },
   menu: { borderRadius: 20, paddingVertical: 8, width: 280, shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 8 },
   menuTitle: { fontSize: 12, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.8, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },

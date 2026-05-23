@@ -23,7 +23,8 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
 ];
 
 function calcNetBalance(name: string, debts: Debt[]): number {
-  return debts.filter(d => d.person === name)
+  return debts
+    .filter(d => d.person === name && d.status === "accepted")
     .reduce((s, d) => s + (d.direction === "them" ? d.amount : -d.amount), 0);
 }
 

@@ -1,11 +1,13 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
-import { getDebts, createDebt } from "@/lib/services/debtService";
+import { getDebts, createDebt, updateDebtStatus as serviceUpdateDebtStatus } from "@/lib/services/debtService";
 import type { CreateDebtInput } from "@/lib/services/debtService";
 
 export type Debt = {
   id: string;
+  /** Auth user id of whoever created this debt row. */
+  creatorId: string;
   person: string;
   /** Contact id of the counterpart (set by debtService). */
   contactId?: string;
@@ -55,7 +57,11 @@ export type Individual = {
 
 type DebtContextType = {
   debts: Debt[];
-  addDebt: (debt: Omit<Debt, "id" | "createdAt" | "status"> & { status?: Debt["status"] }) => Promise<void>;
+  /** Auth user id of the currently signed-in user (null while loading). */
+  currentUserId: string | null;
+  addDebt: (debt: Omit<Debt, "id" | "createdAt" | "status" | "creatorId"> & { status?: Debt["status"] }) => Promise<void>;
+  /** Accept or reject a pending debt; updates local state immediately. */
+  updateDebtStatus: (id: string, status: Debt["status"]) => Promise<void>;
   /** Renames a person string inside all local debts. Called by ContactsContext and GroupsContext when a name changes. */
   renameDebtPerson: (oldName: string, newName: string) => void;
   reset: () => void;
@@ -66,14 +72,16 @@ const DebtContext = createContext<DebtContextType | null>(null);
 
 export function DebtProvider({ children }: { children: ReactNode }) {
   const [debts, setDebts] = useState<Debt[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function loadDebts() {
       try {
         setIsLoading(true);
-        const { debts: loaded } = await getDebts();
+        const { debts: loaded, userId } = await getDebts();
         setDebts(loaded);
+        setCurrentUserId(userId);
       } catch (e) {
         console.error("Failed to load debts:", e);
         setDebts([]);
@@ -92,6 +100,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
         loadDebts();
       } else if (event === "SIGNED_OUT" || (event === "INITIAL_SESSION" && !session?.user)) {
         setDebts([]);
+        setCurrentUserId(null);
         setIsLoading(false);
       }
     });
@@ -99,7 +108,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  function addDebt(input: Omit<Debt, "id" | "createdAt" | "status"> & { status?: Debt["status"] }): Promise<void> {
+  function addDebt(input: Omit<Debt, "id" | "createdAt" | "status" | "creatorId"> & { status?: Debt["status"] }): Promise<void> {
     const debtInput: CreateDebtInput = {
       person: input.person,
       contactId: input.contactId,
@@ -115,6 +124,11 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       .then(created => { setDebts(prev => [created, ...prev]); });
   }
 
+  async function updateDebtStatus(id: string, status: Debt["status"]) {
+    await serviceUpdateDebtStatus(id, status);
+    setDebts(prev => prev.map(d => d.id === id ? { ...d, status } : d));
+  }
+
   function renameDebtPerson(oldName: string, newName: string) {
     setDebts(prev =>
       prev.map(d => d.person === oldName ? { ...d, person: newName } : d)
@@ -127,7 +141,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
 
   return (
     <DebtContext.Provider value={{
-      debts, addDebt,
+      debts, currentUserId, addDebt, updateDebtStatus,
       renameDebtPerson,
       reset,
       isLoading,

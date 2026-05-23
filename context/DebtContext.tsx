@@ -55,7 +55,7 @@ export type Individual = {
 
 type DebtContextType = {
   debts: Debt[];
-  addDebt: (debt: Omit<Debt, "id" | "createdAt" | "status"> & { status?: Debt["status"] }) => void;
+  addDebt: (debt: Omit<Debt, "id" | "createdAt" | "status"> & { status?: Debt["status"] }) => Promise<void>;
   /** Renames a person string inside all local debts. Called by ContactsContext and GroupsContext when a name changes. */
   renameDebtPerson: (oldName: string, newName: string) => void;
   reset: () => void;
@@ -96,7 +96,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  function addDebt(input: Omit<Debt, "id" | "createdAt" | "status"> & { status?: Debt["status"] }) {
+  function addDebt(input: Omit<Debt, "id" | "createdAt" | "status"> & { status?: Debt["status"] }): Promise<void> {
     const debtInput: CreateDebtInput = {
       person: input.person,
       contactId: input.contactId,
@@ -107,11 +107,9 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       deadline: input.deadline,
       status: input.status,
     };
-    // Fire-and-forget: prepend the server-returned debt (with correct id and
-    // direction calculated from the current user) once Supabase confirms.
-    createDebt(debtInput)
-      .then(created => setDebts(prev => [created, ...prev]))
-      .catch(err => console.error("Failed to save debt:", err));
+    // Returns the promise so callers can await and surface errors (e.g. "No account found").
+    return createDebt(debtInput)
+      .then(created => { setDebts(prev => [created, ...prev]); });
   }
 
   function renameDebtPerson(oldName: string, newName: string) {

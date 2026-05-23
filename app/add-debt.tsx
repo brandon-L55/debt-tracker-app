@@ -55,7 +55,7 @@ export default function AddDebtScreen() {
     setPersonInput("");
   }
 
-  function handleSave() {
+  async function handleSave() {
     const parsedAmount = parseFloat(amount);
     if (!parsedAmount || parsedAmount <= 0) { Alert.alert("Invalid amount", "Please enter an amount greater than $0.00."); return; }
     const trimmedInput = personInput.trim();
@@ -71,10 +71,15 @@ export default function AddDebtScreen() {
     }
 
     const perPersonAmount = splitEvenly ? parsedAmount / (effectivePeople.length + 1) : parsedAmount;
-    for (const person of effectivePeople) {
-      addDebt({ person, amount: parseFloat(perPersonAmount.toFixed(2)), direction, reason: reason.trim(), deadline: deadlineISO });
+    try {
+      for (const person of effectivePeople) {
+        await addDebt({ person, amount: parseFloat(perPersonAmount.toFixed(2)), direction, reason: reason.trim(), deadline: deadlineISO });
+      }
+      router.back();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Please try again.";
+      Alert.alert("Could not save debt", msg);
     }
-    router.back();
   }
 
   const parsedAmount = parseFloat(amount) || 0;

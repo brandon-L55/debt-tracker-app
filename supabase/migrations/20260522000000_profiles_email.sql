@@ -16,14 +16,17 @@ create unique index if not exists profiles_email_idx
   on public.profiles(lower(email))
   where email is not null;
 
--- 3. Back-fill from auth.users for any existing profile rows.
+-- 3. Back-fill from auth.users for every existing profile row where email
+--    is missing or stale.  Runs unconditionally so a partial-apply is safe.
 update public.profiles p
 set    email = lower(trim(u.email))
 from   auth.users u
-where  p.id    = u.id
+where  p.id = u.id
+  and  u.email is not null
   and  p.email is distinct from lower(trim(u.email));
 
--- 4. Make handle_new_user() also copy the email on sign-up.
+-- 4. Replace handle_new_user() so it copies email on INSERT and on any
+--    future email change (e.g. email confirmation re-fires the trigger).
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -43,12 +46,20 @@ $$;
 -- 5. Allow any authenticated user to read profiles by email so that
 --    findOrCreateContactByEmail() can resolve a user_id without
 --    needing service_role.
---    We expose only id + email (enough for linking; nothing sensitive).
 drop policy if exists "profiles: email lookup" on public.profiles;
 
 create policy "profiles: email lookup"
   on public.profiles for select
-  using (auth.uid() is not null);   -- any signed-in user can look up other profiles by email
+  using (auth.uid() is not null);
 
--- The existing "profiles: owner select" is now redundant (covered by the
--- broader policy above) but harmless — leave it so a downgrade is easy.
+-- 6. Allow each user to insert/update their own profile row so that
+--    the client-side self-heal upsert in AuthContext works.
+drop policy if exists "profiles: owner insert" on public.profiles;
+create policy "profiles: owner insert"
+  on public.profiles for insert
+  with check (id = auth.uid());
+
+drop policy if exists "profiles: owner update" on public.profiles;
+create policy "profiles: owner update"
+  on public.profiles for update
+  using (id = auth.uid());

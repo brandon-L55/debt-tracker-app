@@ -173,13 +173,12 @@ async function resolvePersonForDebt(personInput: string): Promise<{
  * Account B sees debts created by Account A where B is the linked borrower.
  */
 export async function getDebts(): Promise<{ debts: Debt[]; userId: string }> {
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-  if (userError || !user) throw new Error("Not authenticated");
+  // Use getSession() (reads local cache) instead of getUser() (network round-trip)
+  // so this never throws "Not authenticated" during the initial session restore.
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) throw new Error("Not authenticated");
 
-  const uid = user.id;
+  const uid = session.user.id;
   const { data, error } = await supabase
     .from("debts")
     .select(SELECT_FIELDS)

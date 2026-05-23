@@ -173,18 +173,47 @@ export async function findOrCreateContactByEmail(
 
   if (existing) {
     const row = existing as { id: string; linked_user_id: string | null };
-    return { id: row.id, linkedUserId: row.linked_user_id ?? null };
+    if (row.linked_user_id) {
+      return { id: row.id, linkedUserId: row.linked_user_id };
+    }
+    // Existing contact has no linked_user_id — look up profile and backfill.
+    const { data: profileEx, error: profileExErr } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("email", normalizedEmail)
+      .maybeSingle();
+    const profileId = (profileEx as { id: string } | null)?.id ?? null;
+    console.log("[DEBUG] findOrCreateContactByEmail (existing) — normalizedEmail:", normalizedEmail,
+      "profileData:", profileEx, "profileError:", profileExErr?.message ?? null,
+      "linkedUserId:", profileId);
+    if (!profileId) {
+      const { data: allP } = await supabase.from("profiles").select("id, email").limit(20);
+      console.log("[DEBUG] All profile emails in table:", JSON.stringify(allP));
+      throw new Error("No account found for this email");
+    }
+    await supabase
+      .from("contacts")
+      .update({ linked_user_id: profileId })
+      .eq("id", row.id);
+    return { id: row.id, linkedUserId: profileId };
   }
 
-  // 2. Look up profiles by email to get real user_id (requires
-  //    migration 20260522000000_profiles_email to be applied).
-  const { data: profile } = await supabase
+  // 2. Look up profiles by email to get real user_id.
+  const { data: profile, error: profileErr } = await supabase
     .from("profiles")
     .select("id")
     .eq("email", normalizedEmail)
     .maybeSingle();
 
   const linkedUserId = (profile as { id: string } | null)?.id ?? null;
+  console.log("[DEBUG] findOrCreateContactByEmail (new) — normalizedEmail:", normalizedEmail,
+    "profileData:", profile, "profileError:", profileErr?.message ?? null,
+    "linkedUserId:", linkedUserId);
+  if (!linkedUserId) {
+    const { data: allP } = await supabase.from("profiles").select("id, email").limit(20);
+    console.log("[DEBUG] All profile emails in table:", JSON.stringify(allP));
+    throw new Error("No account found for this email");
+  }
 
   // 3. Create the contact; use displayName if provided, else the email itself.
   const name = displayName?.trim() || normalizedEmail;

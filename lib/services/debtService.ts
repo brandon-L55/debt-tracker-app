@@ -14,6 +14,7 @@ type DebtRow = {
   borrower_contact_id: string | null;
   group_id: string | null;
   amount_cents: number;
+  paid_cents: number;
   description: string | null;
   status: string;
   due_date: string | null;
@@ -59,6 +60,7 @@ function rowToDebt(row: DebtRow, currentUserId: string): DebtWithMeta {
   const otherUserId =
     direction === "me" ? row.payer_user_id : row.borrower_user_id;
 
+  const paidCents = row.paid_cents ?? 0;
   return {
     id: row.id,
     creatorId: row.creator_id,
@@ -66,6 +68,7 @@ function rowToDebt(row: DebtRow, currentUserId: string): DebtWithMeta {
     contactId: contactRecord?.id,
     linkedUserId: otherUserId ?? undefined,
     amount: row.amount_cents / 100,
+    remainingAmount: (row.amount_cents - paidCents) / 100,
     direction,
     reason: row.description ?? "",
     status: row.status as Debt["status"],
@@ -380,5 +383,27 @@ export async function updateDebtStatus(
  */
 export async function deleteDebt(id: string): Promise<void> {
   const { error } = await supabase.from("debts").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Record a payment against an accepted or partial debt.
+ * The DB trigger (trg_after_payment_insert) automatically updates
+ * debts.paid_cents and debts.status (partial / paid).
+ */
+export async function createPayment(
+  debtId: string,
+  amountCents: number,
+  note?: string,
+): Promise<void> {
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) throw new Error("Not authenticated");
+
+  const { error } = await supabase.from("payments").insert({
+    debt_id: debtId,
+    payer_user_id: user.id,
+    amount_cents: amountCents,
+    note: note ?? null,
+  });
   if (error) throw new Error(error.message);
 }

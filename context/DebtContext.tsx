@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
-import { getDebts, createDebt, updateDebtStatus as serviceUpdateDebtStatus } from "@/lib/services/debtService";
+import { getDebts, createDebt, updateDebtStatus as serviceUpdateDebtStatus, createPayment } from "@/lib/services/debtService";
 import type { CreateDebtInput } from "@/lib/services/debtService";
 
 export type Debt = {
@@ -14,9 +14,11 @@ export type Debt = {
   /** Auth user id of the counterpart when they have a real account. */
   linkedUserId?: string;
   amount: number;
+  /** Remaining balance after payments. Equals amount when no payments have been made. */
+  remainingAmount: number;
   direction: "them" | "me";
   reason: string;
-  status: "pending" | "accepted" | "rejected" | "paid" | "disputed";
+  status: "pending" | "accepted" | "rejected" | "paid" | "disputed" | "partial";
   createdAt: string;
   groupId?: string;
   deadline?: string | null;
@@ -59,9 +61,14 @@ type DebtContextType = {
   debts: Debt[];
   /** Auth user id of the currently signed-in user (null while loading). */
   currentUserId: string | null;
-  addDebt: (debt: Omit<Debt, "id" | "createdAt" | "status" | "creatorId"> & { status?: Debt["status"] }) => Promise<void>;
+  addDebt: (debt: Omit<Debt, "id" | "createdAt" | "status" | "creatorId" | "remainingAmount"> & { status?: Debt["status"] }) => Promise<void>;
   /** Accept or reject a pending debt; updates local state immediately. */
   updateDebtStatus: (id: string, status: Debt["status"]) => Promise<void>;
+  /**
+   * Record a payment against an accepted/partial debt (amountCents is an integer).
+   * Optimistically updates remainingAmount and status in local state.
+   */
+  addPayment: (debtId: string, amountCents: number) => Promise<void>;
   /** Renames a person string inside all local debts. Called by ContactsContext and GroupsContext when a name changes. */
   renameDebtPerson: (oldName: string, newName: string) => void;
   reset: () => void;
@@ -108,7 +115,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  function addDebt(input: Omit<Debt, "id" | "createdAt" | "status" | "creatorId"> & { status?: Debt["status"] }): Promise<void> {
+  function addDebt(input: Omit<Debt, "id" | "createdAt" | "status" | "creatorId" | "remainingAmount"> & { status?: Debt["status"] }): Promise<void> {
     const debtInput: CreateDebtInput = {
       person: input.person,
       contactId: input.contactId,
@@ -129,6 +136,17 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     setDebts(prev => prev.map(d => d.id === id ? { ...d, status } : d));
   }
 
+  async function addPayment(debtId: string, amountCents: number) {
+    await createPayment(debtId, amountCents);
+    // Optimistically mirror what the DB trigger computes.
+    setDebts(prev => prev.map(d => {
+      if (d.id !== debtId) return d;
+      const newRemaining = Math.max(0, d.remainingAmount - amountCents / 100);
+      const newStatus: Debt["status"] = newRemaining <= 0 ? "paid" : "partial";
+      return { ...d, remainingAmount: newRemaining, status: newStatus };
+    }));
+  }
+
   function renameDebtPerson(oldName: string, newName: string) {
     setDebts(prev =>
       prev.map(d => d.person === oldName ? { ...d, person: newName } : d)
@@ -141,7 +159,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
 
   return (
     <DebtContext.Provider value={{
-      debts, currentUserId, addDebt, updateDebtStatus,
+      debts, currentUserId, addDebt, updateDebtStatus, addPayment,
       renameDebtPerson,
       reset,
       isLoading,

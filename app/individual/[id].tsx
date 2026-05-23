@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useDebts } from "@/context/DebtContext";
 import { useContacts } from "@/context/ContactsContext";
@@ -63,22 +63,28 @@ function sortDebts(debts: Debt[], sort: DebtSortOption, td: string): Debt[] {
 
 function statusStyle(status: string) {
   switch (status) {
-    case "paid": return { backgroundColor: "#16A34A" };
+    case "paid":     return { backgroundColor: "#16A34A" };
     case "accepted": return { backgroundColor: "#2563EB" };
+    case "partial":  return { backgroundColor: "#0891B2" };
     case "rejected": return { backgroundColor: "#DC2626" };
     case "disputed": return { backgroundColor: "#7C3AED" };
-    default: return { backgroundColor: "#F59E0B" };
+    default:         return { backgroundColor: "#F59E0B" };
   }
 }
 
 export default function IndividualDashboardScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { debts, currentUserId, updateDebtStatus } = useDebts();
+  const { debts, currentUserId, updateDebtStatus, addPayment } = useDebts();
   const { individuals } = useContacts();
   const { colors: t } = useTheme();
   const [sort, setSort] = useState<DebtSortOption>("date");
   const [showSortMenu, setShowSortMenu] = useState(false);
+
+  // Payment modal state
+  const [payingDebt, setPayingDebt] = useState<{ id: string; remaining: number } | null>(null);
+  const [payAmount, setPayAmount] = useState("");
+  const [payLoading, setPayLoading] = useState(false);
 
   async function handleAccept(debtId: string) {
     try { await updateDebtStatus(debtId, "accepted"); }
@@ -87,6 +93,41 @@ export default function IndividualDashboardScreen() {
   async function handleDecline(debtId: string) {
     try { await updateDebtStatus(debtId, "rejected"); }
     catch (e: any) { Alert.alert("Error", e?.message ?? "Could not decline debt."); }
+  }
+
+  function openPayModal(debtId: string, remaining: number) {
+    setPayAmount("");
+    setPayingDebt({ id: debtId, remaining });
+  }
+
+  async function handleMarkPaid(debtId: string, remaining: number) {
+    try {
+      await addPayment(debtId, Math.round(remaining * 100));
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Could not mark as paid.");
+    }
+  }
+
+  async function handleConfirmPayment() {
+    if (!payingDebt) return;
+    const cents = Math.round(parseFloat(payAmount) * 100);
+    if (!cents || cents <= 0) {
+      Alert.alert("Invalid amount", "Please enter a positive amount.");
+      return;
+    }
+    if (cents > Math.round(payingDebt.remaining * 100)) {
+      Alert.alert("Too much", `Maximum payment is $${payingDebt.remaining.toFixed(2)}.`);
+      return;
+    }
+    setPayLoading(true);
+    try {
+      await addPayment(payingDebt.id, cents);
+      setPayingDebt(null);
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Could not record payment.");
+    } finally {
+      setPayLoading(false);
+    }
   }
 
   const td = today();
@@ -102,9 +143,13 @@ export default function IndividualDashboardScreen() {
   }
 
   const personDebts = debts.filter(d => d.person === person.name);
-  // Only accepted debts count toward per-person totals.
-  const iOwe = personDebts.filter(d => d.direction === "me" && d.status === "accepted").reduce((s, d) => s + d.amount, 0);
-  const owedToMe = personDebts.filter(d => d.direction === "them" && d.status === "accepted").reduce((s, d) => s + d.amount, 0);
+  // Accepted + partial debts use remainingAmount for per-person totals.
+  const iOwe = personDebts
+    .filter(d => d.direction === "me" && (d.status === "accepted" || d.status === "partial"))
+    .reduce((s, d) => s + d.remainingAmount, 0);
+  const owedToMe = personDebts
+    .filter(d => d.direction === "them" && (d.status === "accepted" || d.status === "partial"))
+    .reduce((s, d) => s + d.remainingAmount, 0);
   const displayDebts = useMemo(() => sortDebts(personDebts, sort, td), [debts, sort, person.name]);
   const activeSortLabel = DEBT_SORT_OPTIONS.find(o => o.value === sort)?.label ?? "";
 
@@ -181,8 +226,11 @@ export default function IndividualDashboardScreen() {
                 </View>
                 <View style={styles.txRight}>
                   <Text style={[styles.txAmount, { color: debt.direction === "me" ? t.red : t.green }]}>
-                    {debt.direction === "me" ? "-" : "+"}${debt.amount.toFixed(2)}
+                    {debt.direction === "me" ? "-" : "+"}${debt.remainingAmount.toFixed(2)}
                   </Text>
+                  {debt.status === "partial" && (
+                    <Text style={[styles.txOrig, { color: t.textMuted }]}>of ${debt.amount.toFixed(2)}</Text>
+                  )}
                   <Text style={[styles.txDir, { color: t.textSub }]}>{debt.direction === "me" ? "You owe" : "Owes you"}</Text>
                 </View>
               </View>
@@ -202,6 +250,22 @@ export default function IndividualDashboardScreen() {
                   </Pressable>
                 </View>
               )}
+              {(debt.status === "accepted" || debt.status === "partial") && (
+                <View style={styles.txActionRow}>
+                  <Pressable
+                    style={[styles.txActionBtn, { backgroundColor: t.primarySoft, borderColor: t.primaryBorder }]}
+                    onPress={() => openPayModal(debt.id, debt.remainingAmount)}
+                  >
+                    <Text style={[styles.txActionText, { color: t.primary }]}>💳 Add Payment</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.txActionBtn, { backgroundColor: t.greenSoft, borderColor: t.greenBorder }]}
+                    onPress={() => handleMarkPaid(debt.id, debt.remainingAmount)}
+                  >
+                    <Text style={[styles.txActionText, { color: t.green }]}>✓ Mark Paid</Text>
+                  </Pressable>
+                </View>
+              )}
             </View>
           );
         })}
@@ -218,6 +282,45 @@ export default function IndividualDashboardScreen() {
                 {sort === opt.value && <Text style={[styles.menuCheck, { color: t.primary }]}>✓</Text>}
               </Pressable>
             ))}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ── Add Payment modal ── */}
+      <Modal visible={payingDebt !== null} transparent animationType="fade" onRequestClose={() => setPayingDebt(null)}>
+        <Pressable style={styles.overlay} onPress={() => setPayingDebt(null)}>
+          <Pressable style={[styles.payModal, { backgroundColor: t.elevatedCard, borderColor: t.border }]} onPress={e => e.stopPropagation()}>
+            <Text style={[styles.payTitle, { color: t.text }]}>Add Payment</Text>
+            {payingDebt && (
+              <Text style={[styles.payHint, { color: t.textSub }]}>
+                Remaining: ${payingDebt.remaining.toFixed(2)}
+              </Text>
+            )}
+            <TextInput
+              style={[styles.payInput, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
+              placeholder="Amount (e.g. 50.00)"
+              placeholderTextColor={t.textMuted}
+              keyboardType="decimal-pad"
+              value={payAmount}
+              onChangeText={setPayAmount}
+              autoFocus
+            />
+            <View style={styles.payActions}>
+              <Pressable
+                style={[styles.payBtn, { backgroundColor: t.card, borderColor: t.border }]}
+                onPress={() => setPayingDebt(null)}
+                disabled={payLoading}
+              >
+                <Text style={[styles.payBtnText, { color: t.text }]}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.payBtn, { backgroundColor: t.primarySoft, borderColor: t.primaryBorder, opacity: payLoading ? 0.6 : 1 }]}
+                onPress={handleConfirmPayment}
+                disabled={payLoading}
+              >
+                <Text style={[styles.payBtnText, { color: t.primary }]}>{payLoading ? "Saving…" : "Confirm"}</Text>
+              </Pressable>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
@@ -255,11 +358,19 @@ const styles = StyleSheet.create({
   dlLabel: { fontSize: 11, marginTop: 4, fontWeight: "500" },
   txRight: { alignItems: "flex-end" },
   txAmount: { fontSize: 17, fontWeight: "700" },
+  txOrig: { fontSize: 11, marginTop: 1 },
   txDir: { fontSize: 12, marginTop: 2 },
   txActionRow: { flexDirection: "row", gap: 8, marginTop: 12 },
   txActionBtn: { flex: 1, borderRadius: 10, borderWidth: 1, paddingVertical: 8, alignItems: "center" },
   txActionText: { fontSize: 13, fontWeight: "700" },
-  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", alignItems: "center" },
+  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },
+  payModal: { width: 320, borderRadius: 20, borderWidth: 1, padding: 24, gap: 14 },
+  payTitle: { fontSize: 18, fontWeight: "700" },
+  payHint: { fontSize: 13 },
+  payInput: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16 },
+  payActions: { flexDirection: "row", gap: 10 },
+  payBtn: { flex: 1, borderRadius: 12, borderWidth: 1, paddingVertical: 12, alignItems: "center" },
+  payBtnText: { fontSize: 15, fontWeight: "700" },
   menu: { borderRadius: 20, paddingVertical: 8, width: 280, shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 8 },
   menuTitle: { fontSize: 12, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.8, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
   menuRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, marginHorizontal: 8, borderRadius: 10 },

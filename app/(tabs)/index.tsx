@@ -80,9 +80,14 @@ export default function HomeScreen() {
   const [visibleDebtCount, setVisibleDebtCount] = useState(10);
 
   const td = today();
-  // Only accepted debts count toward dashboard totals (pending/rejected/disputed excluded).
-  const youOwe = debts.filter(d => d.direction === "me" && d.status === "accepted").reduce((s, d) => s + d.amount, 0);
-  const owedToYou = debts.filter(d => d.direction === "them" && d.status === "accepted").reduce((s, d) => s + d.amount, 0);
+  // Accepted + partial debts count toward totals; use remainingAmount so paid-down
+  // balances are reflected and fully-paid debts are excluded.
+  const youOwe = debts
+    .filter(d => d.direction === "me" && (d.status === "accepted" || d.status === "partial"))
+    .reduce((s, d) => s + d.remainingAmount, 0);
+  const owedToYou = debts
+    .filter(d => d.direction === "them" && (d.status === "accepted" || d.status === "partial"))
+    .reduce((s, d) => s + d.remainingAmount, 0);
   const displayDebts = useMemo(() => sortDebts(debts, sort, td), [debts, sort]);
   const activeSortLabel = DEBT_SORT_OPTIONS.find(o => o.value === sort)?.label ?? "";
 
@@ -215,8 +220,11 @@ export default function HomeScreen() {
                       </View>
                       <View style={styles.debtRight}>
                         <Text style={[styles.debtAmount, { color: isOwedToMe ? t.green : t.red }]}>
-                          {isOwedToMe ? "+" : "-"}${debt.amount.toFixed(2)}
+                          {isOwedToMe ? "+" : "-"}${debt.remainingAmount.toFixed(2)}
                         </Text>
+                        {debt.status === "partial" && (
+                          <Text style={[styles.debtOrig, { color: t.textMuted }]}>of ${debt.amount.toFixed(2)}</Text>
+                        )}
                         <Text style={[styles.debtDir, { color: t.textMuted }]}>{isOwedToMe ? "Owes you" : "You owe"}</Text>
                       </View>
                     </View>
@@ -319,6 +327,7 @@ const styles = StyleSheet.create({
   dlLabel: { fontSize: 11, marginTop: 3, fontWeight: "600" },
   debtRight: { alignItems: "flex-end" },
   debtAmount: { fontSize: 18, fontWeight: "800" },
+  debtOrig: { fontSize: 11, marginTop: 1 },
   debtDir: { fontSize: 12, marginTop: 2 },
   debtActionRow: { flexDirection: "row", gap: 8, marginTop: 12 },
   debtActionBtn: { flex: 1, borderRadius: 10, borderWidth: 1, paddingVertical: 8, alignItems: "center" },

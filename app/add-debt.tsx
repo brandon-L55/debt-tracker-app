@@ -5,6 +5,10 @@ import { useDebts } from "@/context/DebtContext";
 import { useTheme } from "@/context/ThemeContext";
 import { GradientButton } from "@/components/GradientButton";
 
+function createDebtRequestId() {
+  return `debt:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+}
+
 function parseDeadlineInput(input: string): string | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
@@ -36,8 +40,11 @@ export default function AddDebtScreen() {
   const [direction, setDirection] = useState<"them" | "me" | null>(null);
   const [splitEvenly, setSplitEvenly] = useState(false);
   const [deadline, setDeadline] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   const scrollRef = useRef<ScrollView>(null);
+  const saveInFlightRef = useRef(false);
+  const saveRequestIdsRef = useRef<string[] | null>(null);
   const reasonRef = useRef<View>(null);
   const scrollY = useRef(0);
   const kbHeight = useRef(0);
@@ -56,29 +63,65 @@ export default function AddDebtScreen() {
   }
 
   async function handleSave() {
+    if (saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
+    setIsSaving(true);
     const parsedAmount = parseFloat(amount);
-    if (!parsedAmount || parsedAmount <= 0) { Alert.alert("Invalid amount", "Please enter an amount greater than $0.00."); return; }
+    if (!parsedAmount || parsedAmount <= 0) {
+      saveInFlightRef.current = false;
+      setIsSaving(false);
+      Alert.alert("Invalid amount", "Please enter an amount greater than $0.00.");
+      return;
+    }
     const trimmedInput = personInput.trim();
     const effectivePeople = trimmedInput && !people.includes(trimmedInput)
       ? [...people, trimmedInput]
       : people;
-    if (effectivePeople.length === 0) { Alert.alert("No people added", "Add at least one person to this debt."); return; }
-    if (!direction) { Alert.alert("Missing selection", 'Please select "They owe me" or "I owe them".'); return; }
+    if (effectivePeople.length === 0) {
+      saveInFlightRef.current = false;
+      setIsSaving(false);
+      Alert.alert("No people added", "Add at least one person to this debt.");
+      return;
+    }
+    if (!direction) {
+      saveInFlightRef.current = false;
+      setIsSaving(false);
+      Alert.alert("Missing selection", 'Please select "They owe me" or "I owe them".');
+      return;
+    }
     let deadlineISO: string | null = null;
     if (deadline.trim()) {
       deadlineISO = parseDeadlineInput(deadline);
-      if (!deadlineISO) { Alert.alert("Invalid date", "Enter the deadline as MM/DD/YYYY or leave it blank."); return; }
+      if (!deadlineISO) {
+        saveInFlightRef.current = false;
+        setIsSaving(false);
+        Alert.alert("Invalid date", "Enter the deadline as MM/DD/YYYY or leave it blank.");
+        return;
+      }
     }
 
     const perPersonAmount = splitEvenly ? parsedAmount / (effectivePeople.length + 1) : parsedAmount;
+    if (!saveRequestIdsRef.current || saveRequestIdsRef.current.length !== effectivePeople.length) {
+      saveRequestIdsRef.current = effectivePeople.map(() => createDebtRequestId());
+    }
     try {
-      for (const person of effectivePeople) {
-        await addDebt({ person, amount: parseFloat(perPersonAmount.toFixed(2)), direction, reason: reason.trim(), deadline: deadlineISO });
+      for (let i = 0; i < effectivePeople.length; i += 1) {
+        await addDebt({
+          person: effectivePeople[i],
+          amount: parseFloat(perPersonAmount.toFixed(2)),
+          direction,
+          reason: reason.trim(),
+          deadline: deadlineISO,
+          clientRequestId: saveRequestIdsRef.current[i],
+        });
       }
       router.replace("/(tabs)");
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Please try again.";
       Alert.alert("Could not save debt", msg);
+      saveRequestIdsRef.current = null;
+      saveInFlightRef.current = false;
+      setIsSaving(false);
     }
   }
 
@@ -237,8 +280,9 @@ export default function AddDebtScreen() {
         </View>
 
         <GradientButton
-          label="Save Debt"
+          label={isSaving ? "Saving..." : "Save Debt"}
           onPress={handleSave}
+          disabled={isSaving}
           style={{ marginTop: 10, marginBottom: 40 }}
         />
       </ScrollView>

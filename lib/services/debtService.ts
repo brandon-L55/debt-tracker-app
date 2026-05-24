@@ -255,6 +255,7 @@ export type CreateDebtInput = {
   groupId?: string;
   deadline?: string | null;
   status?: Debt["status"];
+  clientRequestId?: string;
 };
 
 export type UpdateDebtDetailsInput = {
@@ -271,6 +272,28 @@ export async function resolvePersonToContactId(
 ): Promise<string> {
   const { contactId } = await resolvePersonForDebt(personInput);
   return contactId;
+}
+
+function createDebtClientRequestId() {
+  return `debt:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+}
+
+async function getDebtByClientRequestId(
+  clientRequestId: string,
+  currentUserId: string,
+): Promise<Debt> {
+  const { data, error } = await supabase
+    .from("debts")
+    .select(SELECT_FIELDS)
+    .eq("client_request_id", clientRequestId)
+    .single();
+
+  if (error) throw new Error(error.message);
+
+  const debt = rowToDebt(data as DebtRow, currentUserId);
+  await fillMissingPersonNames([debt]);
+  const { _otherUserId: _omit, ...result } = debt;
+  return result;
 }
 
 /**
@@ -312,8 +335,10 @@ export async function createDebt(input: CreateDebtInput): Promise<Debt> {
     linkedUserId = resolved.linkedUserId;
   }
 
+  const clientRequestId = input.clientRequestId ?? createDebtClientRequestId();
   const payload: Record<string, unknown> = {
     creator_id: user.id,
+    client_request_id: clientRequestId,
     amount_cents: Math.round(input.amount * 100),
     description: input.reason || null,
     status: input.status ?? "pending",
@@ -339,6 +364,9 @@ export async function createDebt(input: CreateDebtInput): Promise<Debt> {
     .select(SELECT_FIELDS)
     .single();
 
+  if ((error as { code?: string } | null)?.code === "23505") {
+    return getDebtByClientRequestId(clientRequestId, user.id);
+  }
   if (error) {
     console.error("CREATE DEBT ERROR:", JSON.stringify(error, null, 2));
     throw new Error(error.message ?? "Failed to create debt");
@@ -369,7 +397,10 @@ export async function createDebt(input: CreateDebtInput): Promise<Debt> {
 export async function createManyDebts(
   inputs: CreateDebtInput[],
 ): Promise<Debt[]> {
-  return Promise.all(inputs.map(createDebt));
+  return Promise.all(inputs.map((input) => createDebt({
+    ...input,
+    clientRequestId: input.clientRequestId ?? createDebtClientRequestId(),
+  })));
 }
 
 /**

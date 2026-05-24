@@ -65,7 +65,7 @@ type DebtContextType = {
   debts: Debt[];
   /** Auth user id of the currently signed-in user (null while loading). */
   currentUserId: string | null;
-  addDebt: (debt: Omit<Debt, "id" | "createdAt" | "status" | "creatorId" | "remainingAmount" | "totalPaidAmount" | "totalReceivedAmount"> & { status?: Debt["status"] }) => Promise<void>;
+  addDebt: (debt: Omit<Debt, "id" | "createdAt" | "status" | "creatorId" | "remainingAmount" | "totalPaidAmount" | "totalReceivedAmount"> & { status?: Debt["status"]; clientRequestId?: string }) => Promise<void>;
   /** Accept or reject a pending debt; updates local state immediately. */
   updateDebtStatus: (id: string, status: Debt["status"]) => Promise<void>;
   updateDebtDetails: (id: string, updates: UpdateDebtDetailsInput) => Promise<void>;
@@ -220,7 +220,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  function addDebt(input: Omit<Debt, "id" | "createdAt" | "status" | "creatorId" | "remainingAmount" | "totalPaidAmount" | "totalReceivedAmount"> & { status?: Debt["status"] }): Promise<void> {
+  function addDebt(input: Omit<Debt, "id" | "createdAt" | "status" | "creatorId" | "remainingAmount" | "totalPaidAmount" | "totalReceivedAmount"> & { status?: Debt["status"]; clientRequestId?: string }): Promise<void> {
     const debtInput: CreateDebtInput = {
       person: input.person,
       contactId: input.contactId,
@@ -230,10 +230,11 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       groupId: input.groupId,
       deadline: input.deadline,
       status: input.status,
+      clientRequestId: input.clientRequestId,
     };
     // Returns the promise so callers can await and surface errors (e.g. "No account found").
     return createDebt(debtInput)
-      .then(created => { setDebts(prev => [created, ...prev]); });
+      .then(created => { setDebts(prev => prev.some(d => d.id === created.id) ? prev : [created, ...prev]); });
   }
 
   async function updateDebtStatus(id: string, status: Debt["status"]) {

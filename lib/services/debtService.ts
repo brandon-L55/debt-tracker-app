@@ -69,6 +69,8 @@ function rowToDebt(row: DebtRow, currentUserId: string): DebtWithMeta {
     linkedUserId: otherUserId ?? undefined,
     amount: row.amount_cents / 100,
     remainingAmount: (row.amount_cents - paidCents) / 100,
+    totalPaidAmount: direction === "me" ? paidCents / 100 : 0,
+    totalReceivedAmount: direction === "them" ? paidCents / 100 : 0,
     direction,
     reason: row.description ?? "",
     status: row.status as Debt["status"],
@@ -394,8 +396,9 @@ export async function deleteDebt(id: string): Promise<void> {
 export async function createPayment(
   debtId: string,
   amountCents: number,
+  clientRequestId: string,
   note?: string,
-): Promise<void> {
+): Promise<"inserted" | "duplicate"> {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError || !user) throw new Error("Not authenticated");
 
@@ -403,7 +406,10 @@ export async function createPayment(
     debt_id: debtId,
     payer_user_id: user.id,
     amount_cents: amountCents,
+    client_request_id: clientRequestId,
     note: note ?? null,
   });
+  if ((error as { code?: string } | null)?.code === "23505") return "duplicate";
   if (error) throw new Error(error.message);
+  return "inserted";
 }

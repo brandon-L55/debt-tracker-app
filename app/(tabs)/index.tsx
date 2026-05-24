@@ -88,7 +88,9 @@ export default function HomeScreen() {
   const owedToYou = debts
     .filter(d => d.direction === "them" && (d.status === "accepted" || d.status === "partial"))
     .reduce((s, d) => s + d.remainingAmount, 0);
-  const displayDebts = useMemo(() => sortDebts(debts, sort, td), [debts, sort]);
+  const totalPaid = debts.reduce((s, d) => s + d.totalPaidAmount, 0);
+  const totalReceived = debts.reduce((s, d) => s + d.totalReceivedAmount, 0);
+  const displayDebts = useMemo(() => sortDebts(debts, sort, td), [debts, sort, td]);
   const activeSortLabel = DEBT_SORT_OPTIONS.find(o => o.value === sort)?.label ?? "";
 
   const statCards = [
@@ -120,7 +122,7 @@ export default function HomeScreen() {
     },
     {
       label: "Total Paid",
-      value: "$0.00",
+      value: `$${totalPaid.toFixed(2)}`,
       valueColor: isDark ? "#A78BFA" : "#7C3AED",
       gradient: isDark
         ? ["rgba(124,58,237,0.38)", "rgba(10,13,32,0.96)"] as [string, string]
@@ -133,7 +135,7 @@ export default function HomeScreen() {
     },
     {
       label: "Total Received",
-      value: "$0.00",
+      value: `$${totalReceived.toFixed(2)}`,
       valueColor: isDark ? "#FF4ECD" : "#EC4899",
       gradient: isDark
         ? ["rgba(255,78,205,0.28)", "rgba(6,214,160,0.20)"] as [string, string]

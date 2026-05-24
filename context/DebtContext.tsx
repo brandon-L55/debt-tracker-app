@@ -16,6 +16,10 @@ export type Debt = {
   amount: number;
   /** Remaining balance after payments. Equals amount when no payments have been made. */
   remainingAmount: number;
+  /** Sum of payments made by the current user for this debt. */
+  totalPaidAmount: number;
+  /** Sum of payments received by the current user for this debt. */
+  totalReceivedAmount: number;
   direction: "them" | "me";
   reason: string;
   status: "pending" | "accepted" | "rejected" | "paid" | "disputed" | "partial";
@@ -61,14 +65,14 @@ type DebtContextType = {
   debts: Debt[];
   /** Auth user id of the currently signed-in user (null while loading). */
   currentUserId: string | null;
-  addDebt: (debt: Omit<Debt, "id" | "createdAt" | "status" | "creatorId" | "remainingAmount"> & { status?: Debt["status"] }) => Promise<void>;
+  addDebt: (debt: Omit<Debt, "id" | "createdAt" | "status" | "creatorId" | "remainingAmount" | "totalPaidAmount" | "totalReceivedAmount"> & { status?: Debt["status"] }) => Promise<void>;
   /** Accept or reject a pending debt; updates local state immediately. */
   updateDebtStatus: (id: string, status: Debt["status"]) => Promise<void>;
   /**
    * Record a payment against an accepted/partial debt (amountCents is an integer).
    * Optimistically updates remainingAmount and status in local state.
    */
-  addPayment: (debtId: string, amountCents: number) => Promise<void>;
+  addPayment: (debtId: string, amountCents: number, clientRequestId?: string) => Promise<void>;
   /** Renames a person string inside all local debts. Called by ContactsContext and GroupsContext when a name changes. */
   renameDebtPerson: (oldName: string, newName: string) => void;
   reset: () => void;
@@ -77,11 +81,16 @@ type DebtContextType = {
 
 const DebtContext = createContext<DebtContextType | null>(null);
 
+function createClientRequestId(debtId: string) {
+  return `payment:${debtId}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+}
+
 export function DebtProvider({ children }: { children: ReactNode }) {
   const [debts, setDebts] = useState<Debt[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const debtsRef = useRef<Debt[]>([]);
+  const paymentInFlightRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     debtsRef.current = debts;
@@ -209,7 +218,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  function addDebt(input: Omit<Debt, "id" | "createdAt" | "status" | "creatorId" | "remainingAmount"> & { status?: Debt["status"] }): Promise<void> {
+  function addDebt(input: Omit<Debt, "id" | "createdAt" | "status" | "creatorId" | "remainingAmount" | "totalPaidAmount" | "totalReceivedAmount"> & { status?: Debt["status"] }): Promise<void> {
     const debtInput: CreateDebtInput = {
       person: input.person,
       contactId: input.contactId,
@@ -230,15 +239,38 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     setDebts(prev => prev.map(d => d.id === id ? { ...d, status } : d));
   }
 
-  async function addPayment(debtId: string, amountCents: number) {
-    await createPayment(debtId, amountCents);
-    // Optimistically mirror what the DB trigger computes.
-    setDebts(prev => prev.map(d => {
-      if (d.id !== debtId) return d;
-      const newRemaining = Math.max(0, d.remainingAmount - amountCents / 100);
-      const newStatus: Debt["status"] = newRemaining <= 0 ? "paid" : "partial";
-      return { ...d, remainingAmount: newRemaining, status: newStatus };
-    }));
+  async function addPayment(debtId: string, amountCents: number, clientRequestId?: string) {
+    if (paymentInFlightRef.current.has(debtId)) return;
+
+    paymentInFlightRef.current.add(debtId);
+    try {
+      const requestId = clientRequestId ?? createClientRequestId(debtId);
+      const beforePayment = debtsRef.current.find(d => d.id === debtId);
+      const expectedRemainingCents = beforePayment
+        ? Math.max(0, Math.round(beforePayment.remainingAmount * 100) - amountCents)
+        : null;
+
+      const paymentResult = await createPayment(debtId, amountCents, requestId);
+      if (paymentResult === "duplicate") return;
+
+      setDebts(prev => prev.map(d => {
+        if (d.id !== debtId || expectedRemainingCents === null) return d;
+        const currentRemainingCents = Math.round(d.remainingAmount * 100);
+        const newRemainingCents = Math.min(currentRemainingCents, expectedRemainingCents);
+        const newStatus: Debt["status"] = newRemainingCents <= 0 ? "paid" : "partial";
+        const paymentAmount = amountCents / 100;
+        return {
+          ...d,
+          remainingAmount: newRemainingCents / 100,
+          status: newStatus,
+          totalPaidAmount: d.totalPaidAmount + paymentAmount,
+          totalReceivedAmount:
+            d.direction === "them" ? d.totalReceivedAmount + paymentAmount : d.totalReceivedAmount,
+        };
+      }));
+    } finally {
+      paymentInFlightRef.current.delete(debtId);
+    }
   }
 
   function renameDebtPerson(oldName: string, newName: string) {

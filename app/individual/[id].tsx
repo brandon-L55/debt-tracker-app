@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useDebts } from "@/context/DebtContext";
@@ -72,6 +72,10 @@ function statusStyle(status: string) {
   }
 }
 
+function createPaymentRequestId(debtId: string) {
+  return `payment:${debtId}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+}
+
 export default function IndividualDashboardScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -82,9 +86,27 @@ export default function IndividualDashboardScreen() {
   const [showSortMenu, setShowSortMenu] = useState(false);
 
   // Payment modal state
-  const [payingDebt, setPayingDebt] = useState<{ id: string; remaining: number } | null>(null);
+  const [payingDebt, setPayingDebt] = useState<{ id: string; remaining: number; clientRequestId: string } | null>(null);
   const [payAmount, setPayAmount] = useState("");
   const [payLoading, setPayLoading] = useState(false);
+  const paymentSubmittingRef = useRef<Map<string, string>>(new Map());
+  const [paymentSavingIds, setPaymentSavingIds] = useState<Set<string>>(() => new Set());
+
+  function startPaymentSubmit(debtId: string, clientRequestId: string) {
+    if (paymentSubmittingRef.current.has(debtId)) return null;
+    paymentSubmittingRef.current.set(debtId, clientRequestId);
+    setPaymentSavingIds(prev => new Set(prev).add(debtId));
+    return clientRequestId;
+  }
+
+  function finishPaymentSubmit(debtId: string) {
+    paymentSubmittingRef.current.delete(debtId);
+    setPaymentSavingIds(prev => {
+      const next = new Set(prev);
+      next.delete(debtId);
+      return next;
+    });
+  }
 
   async function handleAccept(debtId: string) {
     try { await updateDebtStatus(debtId, "accepted"); }
@@ -96,20 +118,25 @@ export default function IndividualDashboardScreen() {
   }
 
   function openPayModal(debtId: string, remaining: number) {
+    if (paymentSubmittingRef.current.has(debtId)) return;
     setPayAmount("");
-    setPayingDebt({ id: debtId, remaining });
+    setPayingDebt({ id: debtId, remaining, clientRequestId: createPaymentRequestId(debtId) });
   }
 
   async function handleMarkPaid(debtId: string, remaining: number) {
+    const clientRequestId = startPaymentSubmit(debtId, createPaymentRequestId(debtId));
+    if (!clientRequestId) return;
     try {
-      await addPayment(debtId, Math.round(remaining * 100));
+      await addPayment(debtId, Math.round(remaining * 100), clientRequestId);
     } catch (e: any) {
       Alert.alert("Error", e?.message ?? "Could not mark as paid.");
+    } finally {
+      finishPaymentSubmit(debtId);
     }
   }
 
   async function handleConfirmPayment() {
-    if (!payingDebt) return;
+    if (!payingDebt || payLoading) return;
     const cents = Math.round(parseFloat(payAmount) * 100);
     if (!cents || cents <= 0) {
       Alert.alert("Invalid amount", "Please enter a positive amount.");
@@ -119,13 +146,17 @@ export default function IndividualDashboardScreen() {
       Alert.alert("Too much", `Maximum payment is $${payingDebt.remaining.toFixed(2)}.`);
       return;
     }
+    const clientRequestId = startPaymentSubmit(payingDebt.id, payingDebt.clientRequestId);
+    if (!clientRequestId) return;
     setPayLoading(true);
+    const debtId = payingDebt.id;
     try {
-      await addPayment(payingDebt.id, cents);
+      await addPayment(debtId, cents, clientRequestId);
       setPayingDebt(null);
     } catch (e: any) {
       Alert.alert("Error", e?.message ?? "Could not record payment.");
     } finally {
+      finishPaymentSubmit(debtId);
       setPayLoading(false);
     }
   }
@@ -253,14 +284,16 @@ export default function IndividualDashboardScreen() {
               {(debt.status === "accepted" || debt.status === "partial") && (
                 <View style={styles.txActionRow}>
                   <Pressable
-                    style={[styles.txActionBtn, { backgroundColor: t.primarySoft, borderColor: t.primaryBorder }]}
+                    style={[styles.txActionBtn, { backgroundColor: t.primarySoft, borderColor: t.primaryBorder, opacity: paymentSavingIds.has(debt.id) ? 0.6 : 1 }]}
                     onPress={() => openPayModal(debt.id, debt.remainingAmount)}
+                    disabled={paymentSavingIds.has(debt.id)}
                   >
                     <Text style={[styles.txActionText, { color: t.primary }]}>💳 Add Payment</Text>
                   </Pressable>
                   <Pressable
-                    style={[styles.txActionBtn, { backgroundColor: t.greenSoft, borderColor: t.greenBorder }]}
+                    style={[styles.txActionBtn, { backgroundColor: t.greenSoft, borderColor: t.greenBorder, opacity: paymentSavingIds.has(debt.id) ? 0.6 : 1 }]}
                     onPress={() => handleMarkPaid(debt.id, debt.remainingAmount)}
+                    disabled={paymentSavingIds.has(debt.id)}
                   >
                     <Text style={[styles.txActionText, { color: t.green }]}>✓ Mark Paid</Text>
                   </Pressable>
@@ -287,8 +320,8 @@ export default function IndividualDashboardScreen() {
       </Modal>
 
       {/* ── Add Payment modal ── */}
-      <Modal visible={payingDebt !== null} transparent animationType="fade" onRequestClose={() => setPayingDebt(null)}>
-        <Pressable style={styles.overlay} onPress={() => setPayingDebt(null)}>
+      <Modal visible={payingDebt !== null} transparent animationType="fade" onRequestClose={() => { if (!payLoading) setPayingDebt(null); }}>
+        <Pressable style={styles.overlay} onPress={() => { if (!payLoading) setPayingDebt(null); }}>
           <Pressable style={[styles.payModal, { backgroundColor: t.elevatedCard, borderColor: t.border }]} onPress={e => e.stopPropagation()}>
             <Text style={[styles.payTitle, { color: t.text }]}>Add Payment</Text>
             {payingDebt && (
@@ -304,6 +337,7 @@ export default function IndividualDashboardScreen() {
               value={payAmount}
               onChangeText={setPayAmount}
               autoFocus
+              editable={!payLoading}
             />
             <View style={styles.payActions}>
               <Pressable

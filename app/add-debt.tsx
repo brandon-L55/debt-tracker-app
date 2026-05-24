@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from "react";
-import { Alert, Dimensions, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Dimensions, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useDebts } from "@/context/DebtContext";
 import { useTheme } from "@/context/ThemeContext";
 import { GradientButton } from "@/components/GradientButton";
+import { getPendingInvitesForEmails } from "@/lib/services/contactsService";
 
 function createDebtRequestId() {
   return `debt:${Date.now()}:${Math.random().toString(36).slice(2)}`;
@@ -26,6 +27,10 @@ function previewDeadline(input: string): string | null {
   if (!iso) return null;
   const [year, month, day] = iso.split("-").map(Number);
   return new Date(year, month - 1, day).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+}
+
+function isEmail(input: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.trim());
 }
 
 export default function AddDebtScreen() {
@@ -115,7 +120,25 @@ export default function AddDebtScreen() {
           clientRequestId: saveRequestIdsRef.current[i],
         });
       }
-      router.replace("/(tabs)");
+      const pendingInvites = await getPendingInvitesForEmails(effectivePeople.filter(isEmail));
+      if (pendingInvites.length > 0) {
+        const message = pendingInvites.map((invite) => invite.message).join("\n\n");
+        Alert.alert(
+          "Invite ready",
+          message,
+          [
+            { text: "Later", onPress: () => router.replace("/(tabs)") },
+            {
+              text: "Share",
+              onPress: () => {
+                Share.share({ message }).finally(() => router.replace("/(tabs)"));
+              },
+            },
+          ],
+        );
+      } else {
+        router.replace("/(tabs)");
+      }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Please try again.";
       Alert.alert("Could not save debt", msg);

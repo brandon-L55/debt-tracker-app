@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { registerForNotificationsAsync } from "@/lib/services/notificationService";
+import { claimInvitedContacts } from "@/lib/services/contactsService";
 
 type AuthCtx = {
   session: Session | null;
@@ -35,6 +36,12 @@ async function selfHealProfile(userId: string, rawEmail: string, label: string) 
 
   if (result.error) {
     console.warn(`[WARN] profile self-heal upsert failure (${label}):`, result.error.message);
+  }
+
+  try {
+    await claimInvitedContacts();
+  } catch (error) {
+    console.warn(`[WARN] invite claim failure (${label}):`, error);
   }
 }
 

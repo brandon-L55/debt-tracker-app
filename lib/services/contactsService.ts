@@ -16,12 +16,21 @@ type ContactRow = {
   silenced: boolean;
   created_at: string;
   linked_user_id: string | null;
+  invited_email: string | null;
+  invite_status: string | null;
+  invite_created_at: string | null;
   // Columns from the base schema (not used by app yet, kept for completeness)
   phone: string | null;
   email: string | null;
   venmo_handle: string | null;
   cashapp_handle: string | null;
   paypal_handle: string | null;
+};
+
+export type PendingInvite = {
+  email: string;
+  inviteLink: string;
+  message: string;
 };
 
 function rowToIndividual(row: ContactRow): Individual {
@@ -186,7 +195,16 @@ export async function findOrCreateContactByEmail(
     if (profileId) {
       await supabase
         .from("contacts")
-        .update({ linked_user_id: profileId })
+        .update({ linked_user_id: profileId, invite_status: "claimed" })
+        .eq("id", row.id);
+    } else {
+      await supabase
+        .from("contacts")
+        .update({
+          invited_email: normalizedEmail,
+          invite_status: "pending",
+          invite_created_at: new Date().toISOString(),
+        })
         .eq("id", row.id);
     }
     return { id: row.id, linkedUserId: profileId };
@@ -213,6 +231,9 @@ export async function findOrCreateContactByEmail(
       name,
       email: normalizedEmail,
       linked_user_id: linkedUserId,
+      invited_email: linkedUserId ? null : normalizedEmail,
+      invite_status: linkedUserId ? "claimed" : "pending",
+      invite_created_at: linkedUserId ? null : new Date().toISOString(),
       sort_order: 9999,
       pinned: false,
       silenced: false,
@@ -224,6 +245,41 @@ export async function findOrCreateContactByEmail(
 
   const newRow = created as { id: string; linked_user_id: string | null };
   return { id: newRow.id, linkedUserId: newRow.linked_user_id ?? null };
+}
+
+export async function getPendingInvitesForEmails(emails: string[]): Promise<PendingInvite[]> {
+  const normalizedEmails = [...new Set(emails.map((email) => email.trim().toLowerCase()).filter(Boolean))];
+  if (normalizedEmails.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("contacts")
+    .select("invited_email, invite_status")
+    .in("invited_email", normalizedEmails)
+    .eq("invite_status", "pending");
+
+  if (error) throw new Error(error.message);
+
+  const invitedEmails = [
+    ...new Set(
+      ((data ?? []) as { invited_email: string | null }[])
+        .map((row) => row.invited_email)
+        .filter((email): email is string => !!email),
+    ),
+  ];
+
+  return invitedEmails.map((email) => {
+    const inviteLink = `debttracker://invite?email=${encodeURIComponent(email)}`;
+    return {
+      email,
+      inviteLink,
+      message: `Join me on Debt Tracker to settle up: ${inviteLink}\nWeb signup: coming soon.`,
+    };
+  });
+}
+
+export async function claimInvitedContacts(): Promise<void> {
+  const { error } = await supabase.rpc("claim_invited_contacts");
+  if (error) throw new Error(error.message);
 }
 
 /**

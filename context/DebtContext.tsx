@@ -1,8 +1,8 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
-import { getDebts, createDebt, updateDebtStatus as serviceUpdateDebtStatus, createPayment } from "@/lib/services/debtService";
-import type { CreateDebtInput } from "@/lib/services/debtService";
+import { getDebts, createDebt, updateDebtStatus as serviceUpdateDebtStatus, updateDebtDetails as serviceUpdateDebtDetails, cancelDebt as serviceCancelDebt, createPayment } from "@/lib/services/debtService";
+import type { CreateDebtInput, UpdateDebtDetailsInput } from "@/lib/services/debtService";
 
 export type Debt = {
   id: string;
@@ -68,6 +68,8 @@ type DebtContextType = {
   addDebt: (debt: Omit<Debt, "id" | "createdAt" | "status" | "creatorId" | "remainingAmount" | "totalPaidAmount" | "totalReceivedAmount"> & { status?: Debt["status"] }) => Promise<void>;
   /** Accept or reject a pending debt; updates local state immediately. */
   updateDebtStatus: (id: string, status: Debt["status"]) => Promise<void>;
+  updateDebtDetails: (id: string, updates: UpdateDebtDetailsInput) => Promise<void>;
+  cancelDebt: (id: string) => Promise<void>;
   /**
    * Record a payment against an accepted/partial debt (amountCents is an integer).
    * Optimistically updates remainingAmount and status in local state.
@@ -239,6 +241,16 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     setDebts(prev => prev.map(d => d.id === id ? { ...d, status } : d));
   }
 
+  async function updateDebtDetails(id: string, updates: UpdateDebtDetailsInput) {
+    const updated = await serviceUpdateDebtDetails(id, updates);
+    setDebts(prev => prev.map(d => d.id === id ? updated : d));
+  }
+
+  async function cancelDebt(id: string) {
+    await serviceCancelDebt(id);
+    setDebts(prev => prev.map(d => d.id === id ? { ...d, status: "rejected" } : d));
+  }
+
   async function addPayment(debtId: string, amountCents: number, clientRequestId?: string) {
     if (paymentInFlightRef.current.has(debtId)) return;
 
@@ -285,7 +297,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
 
   return (
     <DebtContext.Provider value={{
-      debts, currentUserId, addDebt, updateDebtStatus, addPayment,
+      debts, currentUserId, addDebt, updateDebtStatus, updateDebtDetails, cancelDebt, addPayment,
       renameDebtPerson,
       reset,
       isLoading,

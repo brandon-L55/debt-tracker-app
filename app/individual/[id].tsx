@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useRef } from "react";
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useDebts } from "@/context/DebtContext";
@@ -79,7 +79,7 @@ function createPaymentRequestId(debtId: string) {
 export default function IndividualDashboardScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { debts, currentUserId, updateDebtStatus, addPayment } = useDebts();
+  const { debts, currentUserId, updateDebtStatus, updateDebtDetails, cancelDebt, addPayment } = useDebts();
   const { individuals } = useContacts();
   const { colors: t } = useTheme();
   const [sort, setSort] = useState<DebtSortOption>("date");
@@ -91,6 +91,11 @@ export default function IndividualDashboardScreen() {
   const [payLoading, setPayLoading] = useState(false);
   const paymentSubmittingRef = useRef<Map<string, string>>(new Map());
   const [paymentSavingIds, setPaymentSavingIds] = useState<Set<string>>(() => new Set());
+  const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [editReason, setEditReason] = useState("");
+  const [editDeadline, setEditDeadline] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
 
   function startPaymentSubmit(debtId: string, clientRequestId: string) {
     if (paymentSubmittingRef.current.has(debtId)) return null;
@@ -115,6 +120,53 @@ export default function IndividualDashboardScreen() {
   async function handleDecline(debtId: string) {
     try { await updateDebtStatus(debtId, "rejected"); }
     catch (e: any) { Alert.alert("Error", e?.message ?? "Could not decline debt."); }
+  }
+
+  function openEditDebt(debt: Debt) {
+    setEditingDebt(debt);
+    setEditAmount(debt.amount.toFixed(2));
+    setEditReason(debt.reason);
+    setEditDeadline(debt.deadline ?? "");
+  }
+
+  async function handleSaveDebtEdit() {
+    if (!editingDebt || editSaving) return;
+    const amount = parseFloat(editAmount);
+    if (!amount || amount <= 0) {
+      Alert.alert("Invalid amount", "Please enter a positive amount.");
+      return;
+    }
+    if (editDeadline && !/^\d{4}-\d{2}-\d{2}$/.test(editDeadline)) {
+      Alert.alert("Invalid date", "Use YYYY-MM-DD or leave the date blank.");
+      return;
+    }
+    setEditSaving(true);
+    try {
+      await updateDebtDetails(editingDebt.id, {
+        amount,
+        reason: editReason.trim(),
+        deadline: editDeadline.trim() || null,
+      });
+      setEditingDebt(null);
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Could not update debt.");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  function handleCancelDebt(id: string) {
+    Alert.alert("Cancel debt?", "This will remove the pending request from active debt totals.", [
+      { text: "Keep", style: "cancel" },
+      {
+        text: "Cancel Debt",
+        style: "destructive",
+        onPress: async () => {
+          try { await cancelDebt(id); }
+          catch (e: any) { Alert.alert("Error", e?.message ?? "Could not cancel debt."); }
+        },
+      },
+    ]);
   }
 
   function openPayModal(debtId: string, remaining: number) {
@@ -181,7 +233,7 @@ export default function IndividualDashboardScreen() {
   const owedToMe = personDebts
     .filter(d => d.direction === "them" && (d.status === "accepted" || d.status === "partial"))
     .reduce((s, d) => s + d.remainingAmount, 0);
-  const displayDebts = useMemo(() => sortDebts(personDebts, sort, td), [debts, sort, person.name]);
+  const displayDebts = sortDebts(personDebts, sort, td);
   const activeSortLabel = DEBT_SORT_OPTIONS.find(o => o.value === sort)?.label ?? "";
 
   return (
@@ -201,7 +253,7 @@ export default function IndividualDashboardScreen() {
           <Avatar name={person.name} imageUri={person.imageUri} size={72} />
           <View style={{ flex: 1 }}>
             <Text style={[styles.personName, { color: t.text }]}>{person.name}</Text>
-            {person.nickname ? <Text style={[styles.nickname, { color: t.textSub }]}>"{person.nickname}"</Text> : null}
+            {person.nickname ? <Text style={[styles.nickname, { color: t.textSub }]}>{`"${person.nickname}"`}</Text> : null}
             {person.phoneOrUsername ? <Text style={[styles.contact, { color: t.textMuted }]}>{person.phoneOrUsername}</Text> : null}
           </View>
         </View>
@@ -241,8 +293,10 @@ export default function IndividualDashboardScreen() {
         ) : displayDebts.map(debt => {
           const dl = dlInfo(debt.deadline, td);
           const showActions = debt.status === "pending" && !!currentUserId && debt.creatorId !== currentUserId;
+          const showCreatorActions = debt.status === "pending" && !!currentUserId && debt.creatorId === currentUserId;
+          const canMakePayment = debt.direction === "me" && (debt.status === "accepted" || debt.status === "partial");
           return (
-            <View key={debt.id} style={[styles.txRow, { backgroundColor: t.card, borderColor: showActions ? t.primaryBorder : t.border }]}>
+            <View key={debt.id} style={[styles.txRow, { backgroundColor: t.card, borderColor: showActions || showCreatorActions ? t.primaryBorder : t.border }]}>
               <View style={styles.txRowContent}>
                 <View style={styles.txLeft}>
                   {debt.reason ? <Text style={[styles.txReason, { color: t.text }]}>{debt.reason}</Text>
@@ -281,7 +335,23 @@ export default function IndividualDashboardScreen() {
                   </Pressable>
                 </View>
               )}
-              {(debt.status === "accepted" || debt.status === "partial") && (
+              {showCreatorActions && (
+                <View style={styles.txActionRow}>
+                  <Pressable
+                    style={[styles.txActionBtn, { backgroundColor: t.primarySoft, borderColor: t.primaryBorder }]}
+                    onPress={() => openEditDebt(debt)}
+                  >
+                    <Text style={[styles.txActionText, { color: t.primary }]}>Edit</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.txActionBtn, { backgroundColor: t.redSoft, borderColor: t.redBorder }]}
+                    onPress={() => handleCancelDebt(debt.id)}
+                  >
+                    <Text style={[styles.txActionText, { color: t.red }]}>Cancel</Text>
+                  </Pressable>
+                </View>
+              )}
+              {canMakePayment && (
                 <View style={styles.txActionRow}>
                   <Pressable
                     style={[styles.txActionBtn, { backgroundColor: t.primarySoft, borderColor: t.primaryBorder, opacity: paymentSavingIds.has(debt.id) ? 0.6 : 1 }]}
@@ -320,6 +390,55 @@ export default function IndividualDashboardScreen() {
       </Modal>
 
       {/* ── Add Payment modal ── */}
+      <Modal visible={editingDebt !== null} transparent animationType="fade" onRequestClose={() => { if (!editSaving) setEditingDebt(null); }}>
+        <Pressable style={styles.overlay} onPress={() => { if (!editSaving) setEditingDebt(null); }}>
+          <Pressable style={[styles.editModal, { backgroundColor: t.elevatedCard, borderColor: t.border }]} onPress={e => e.stopPropagation()}>
+            <Text style={[styles.editTitle, { color: t.text }]}>Edit Pending Debt</Text>
+            <TextInput
+              style={[styles.editInput, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
+              placeholder="Amount"
+              placeholderTextColor={t.textMuted}
+              keyboardType="decimal-pad"
+              value={editAmount}
+              onChangeText={setEditAmount}
+              editable={!editSaving}
+            />
+            <TextInput
+              style={[styles.editInput, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
+              placeholder="Reason"
+              placeholderTextColor={t.textMuted}
+              value={editReason}
+              onChangeText={setEditReason}
+              editable={!editSaving}
+            />
+            <TextInput
+              style={[styles.editInput, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
+              placeholder="Due date (YYYY-MM-DD)"
+              placeholderTextColor={t.textMuted}
+              value={editDeadline}
+              onChangeText={setEditDeadline}
+              editable={!editSaving}
+            />
+            <View style={styles.editActions}>
+              <Pressable
+                style={[styles.editBtn, { backgroundColor: t.card, borderColor: t.border }]}
+                onPress={() => setEditingDebt(null)}
+                disabled={editSaving}
+              >
+                <Text style={[styles.editBtnText, { color: t.text }]}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.editBtn, { backgroundColor: t.primarySoft, borderColor: t.primaryBorder, opacity: editSaving ? 0.6 : 1 }]}
+                onPress={handleSaveDebtEdit}
+                disabled={editSaving}
+              >
+                <Text style={[styles.editBtnText, { color: t.primary }]}>{editSaving ? "Saving..." : "Save"}</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       <Modal visible={payingDebt !== null} transparent animationType="fade" onRequestClose={() => { if (!payLoading) setPayingDebt(null); }}>
         <Pressable style={styles.overlay} onPress={() => { if (!payLoading) setPayingDebt(null); }}>
           <Pressable style={[styles.payModal, { backgroundColor: t.elevatedCard, borderColor: t.border }]} onPress={e => e.stopPropagation()}>
@@ -405,6 +524,12 @@ const styles = StyleSheet.create({
   payActions: { flexDirection: "row", gap: 10 },
   payBtn: { flex: 1, borderRadius: 12, borderWidth: 1, paddingVertical: 12, alignItems: "center" },
   payBtnText: { fontSize: 15, fontWeight: "700" },
+  editModal: { width: 320, borderRadius: 20, borderWidth: 1, padding: 24, gap: 12 },
+  editTitle: { fontSize: 18, fontWeight: "700" },
+  editInput: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16 },
+  editActions: { flexDirection: "row", gap: 10 },
+  editBtn: { flex: 1, borderRadius: 12, borderWidth: 1, paddingVertical: 12, alignItems: "center" },
+  editBtnText: { fontSize: 15, fontWeight: "700" },
   menu: { borderRadius: 20, paddingVertical: 8, width: 280, shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 8 },
   menuTitle: { fontSize: 12, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.8, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
   menuRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, marginHorizontal: 8, borderRadius: 10 },

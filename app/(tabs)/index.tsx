@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { LinearGradient } from "expo-linear-gradient";
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useDebts } from "@/context/DebtContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useRouter } from "expo-router";
@@ -64,7 +64,7 @@ function sortDebts(debts: Debt[], sort: DebtSortOption, td: string): Debt[] {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { debts, currentUserId, updateDebtStatus } = useDebts();
+  const { debts, currentUserId, updateDebtStatus, updateDebtDetails, cancelDebt } = useDebts();
   const { colors: t, isDark } = useTheme();
 
   async function handleAccept(id: string) {
@@ -78,6 +78,58 @@ export default function HomeScreen() {
   const [sort, setSort] = useState<DebtSortOption>("date");
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [visibleDebtCount, setVisibleDebtCount] = useState(10);
+  const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [editReason, setEditReason] = useState("");
+  const [editDeadline, setEditDeadline] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+
+  function openEditDebt(debt: Debt) {
+    setEditingDebt(debt);
+    setEditAmount(debt.amount.toFixed(2));
+    setEditReason(debt.reason);
+    setEditDeadline(debt.deadline ?? "");
+  }
+
+  async function handleSaveDebtEdit() {
+    if (!editingDebt || editSaving) return;
+    const amount = parseFloat(editAmount);
+    if (!amount || amount <= 0) {
+      Alert.alert("Invalid amount", "Please enter a positive amount.");
+      return;
+    }
+    if (editDeadline && !/^\d{4}-\d{2}-\d{2}$/.test(editDeadline)) {
+      Alert.alert("Invalid date", "Use YYYY-MM-DD or leave the date blank.");
+      return;
+    }
+    setEditSaving(true);
+    try {
+      await updateDebtDetails(editingDebt.id, {
+        amount,
+        reason: editReason.trim(),
+        deadline: editDeadline.trim() || null,
+      });
+      setEditingDebt(null);
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Could not update debt.");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  function handleCancelDebt(id: string) {
+    Alert.alert("Cancel debt?", "This will remove the pending request from active debt totals.", [
+      { text: "Keep", style: "cancel" },
+      {
+        text: "Cancel Debt",
+        style: "destructive",
+        onPress: async () => {
+          try { await cancelDebt(id); }
+          catch (e: any) { Alert.alert("Error", e?.message ?? "Could not cancel debt."); }
+        },
+      },
+    ]);
+  }
 
   const td = today();
   // Accepted + partial debts count toward totals; use remainingAmount so paid-down
@@ -205,10 +257,11 @@ export default function HomeScreen() {
                 const dl = dlInfo(debt.deadline, td);
                 const isOwedToMe = debt.direction === "them";
                 const showActions = debt.status === "pending" && !!currentUserId && debt.creatorId !== currentUserId;
+                const showCreatorActions = debt.status === "pending" && !!currentUserId && debt.creatorId === currentUserId;
                 return (
                   <View key={debt.id} style={[styles.debtRow, {
                     backgroundColor: t.card,
-                    borderColor: showActions ? t.primaryBorder : t.border,
+                    borderColor: showActions || showCreatorActions ? t.primaryBorder : t.border,
                     ...(isDark ? { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 3 } : { shadowColor: "#7C3AED", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 1 }),
                   }]}>
                     <View style={styles.debtRowContent}>
@@ -243,6 +296,22 @@ export default function HomeScreen() {
                           onPress={() => handleDecline(debt.id)}
                         >
                           <Text style={[styles.debtActionText, { color: t.red }]}>✗ Decline</Text>
+                        </Pressable>
+                      </View>
+                    )}
+                    {showCreatorActions && (
+                      <View style={styles.debtActionRow}>
+                        <Pressable
+                          style={[styles.debtActionBtn, { backgroundColor: t.primarySoft, borderColor: t.primaryBorder }]}
+                          onPress={() => openEditDebt(debt)}
+                        >
+                          <Text style={[styles.debtActionText, { color: t.primary }]}>Edit</Text>
+                        </Pressable>
+                        <Pressable
+                          style={[styles.debtActionBtn, { backgroundColor: t.redSoft, borderColor: t.redBorder }]}
+                          onPress={() => handleCancelDebt(debt.id)}
+                        >
+                          <Text style={[styles.debtActionText, { color: t.red }]}>Cancel</Text>
                         </Pressable>
                       </View>
                     )}
@@ -297,6 +366,55 @@ export default function HomeScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <Modal visible={editingDebt !== null} transparent animationType="fade" onRequestClose={() => { if (!editSaving) setEditingDebt(null); }}>
+        <Pressable style={styles.overlay} onPress={() => { if (!editSaving) setEditingDebt(null); }}>
+          <Pressable style={[styles.editModal, { backgroundColor: t.elevatedCard, borderColor: t.border }]} onPress={e => e.stopPropagation()}>
+            <Text style={[styles.editTitle, { color: t.text }]}>Edit Pending Debt</Text>
+            <TextInput
+              style={[styles.editInput, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
+              placeholder="Amount"
+              placeholderTextColor={t.textMuted}
+              keyboardType="decimal-pad"
+              value={editAmount}
+              onChangeText={setEditAmount}
+              editable={!editSaving}
+            />
+            <TextInput
+              style={[styles.editInput, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
+              placeholder="Reason"
+              placeholderTextColor={t.textMuted}
+              value={editReason}
+              onChangeText={setEditReason}
+              editable={!editSaving}
+            />
+            <TextInput
+              style={[styles.editInput, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
+              placeholder="Due date (YYYY-MM-DD)"
+              placeholderTextColor={t.textMuted}
+              value={editDeadline}
+              onChangeText={setEditDeadline}
+              editable={!editSaving}
+            />
+            <View style={styles.editActions}>
+              <Pressable
+                style={[styles.editBtn, { backgroundColor: t.card, borderColor: t.border }]}
+                onPress={() => setEditingDebt(null)}
+                disabled={editSaving}
+              >
+                <Text style={[styles.editBtnText, { color: t.text }]}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.editBtn, { backgroundColor: t.primarySoft, borderColor: t.primaryBorder, opacity: editSaving ? 0.6 : 1 }]}
+                onPress={handleSaveDebtEdit}
+                disabled={editSaving}
+              >
+                <Text style={[styles.editBtnText, { color: t.primary }]}>{editSaving ? "Saving..." : "Save"}</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ScrollView>
   );
 }
@@ -345,4 +463,10 @@ const styles = StyleSheet.create({
   menuRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, marginHorizontal: 8, borderRadius: 12 },
   menuRowText: { flex: 1, fontSize: 15 },
   menuCheck: { fontSize: 15, fontWeight: "700" },
+  editModal: { width: 320, borderRadius: 20, borderWidth: 1, padding: 24, gap: 12 },
+  editTitle: { fontSize: 18, fontWeight: "700" },
+  editInput: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16 },
+  editActions: { flexDirection: "row", gap: 10 },
+  editBtn: { flex: 1, borderRadius: 12, borderWidth: 1, paddingVertical: 12, alignItems: "center" },
+  editBtnText: { fontSize: 15, fontWeight: "700" },
 });

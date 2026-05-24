@@ -257,6 +257,12 @@ export type CreateDebtInput = {
   status?: Debt["status"];
 };
 
+export type UpdateDebtDetailsInput = {
+  amount?: number;
+  reason?: string;
+  deadline?: string | null;
+};
+
 /**
  * Resolves a person input string to a contact id (kept for backward compat).
  */
@@ -380,6 +386,49 @@ export async function updateDebtStatus(
   if (error) throw new Error(error.message);
 }
 
+export async function updateDebtDetails(
+  id: string,
+  updates: UpdateDebtDetailsInput,
+): Promise<Debt> {
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) throw new Error("Not authenticated");
+
+  const payload: Record<string, unknown> = {};
+  if (updates.amount !== undefined) payload.amount_cents = Math.round(updates.amount * 100);
+  if (updates.reason !== undefined) payload.description = updates.reason || null;
+  if (updates.deadline !== undefined) payload.due_date = updates.deadline || null;
+
+  const { data, error } = await supabase
+    .from("debts")
+    .update(payload)
+    .eq("id", id)
+    .eq("creator_id", user.id)
+    .eq("status", "pending")
+    .select(SELECT_FIELDS)
+    .single();
+
+  if (error) throw new Error(error.message);
+
+  const debt = rowToDebt(data as DebtRow, user.id);
+  await fillMissingPersonNames([debt]);
+  const { _otherUserId: _omit, ...result } = debt;
+  return result;
+}
+
+export async function cancelDebt(id: string): Promise<void> {
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) throw new Error("Not authenticated");
+
+  const { error } = await supabase
+    .from("debts")
+    .update({ status: "rejected" })
+    .eq("id", id)
+    .eq("creator_id", user.id)
+    .eq("status", "pending");
+
+  if (error) throw new Error(error.message);
+}
+
 /**
  * Delete a debt by id (creator-only, enforced by RLS).
  */
@@ -401,6 +450,19 @@ export async function createPayment(
 ): Promise<"inserted" | "duplicate"> {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError || !user) throw new Error("Not authenticated");
+
+  const { data: debt, error: debtError } = await supabase
+    .from("debts")
+    .select("borrower_user_id,status")
+    .eq("id", debtId)
+    .single();
+  if (debtError) throw new Error(debtError.message);
+  if (!debt || debt.borrower_user_id !== user.id) {
+    throw new Error("Only the debtor can make payments.");
+  }
+  if (debt.status !== "accepted" && debt.status !== "partial") {
+    throw new Error("Payments are only allowed on accepted or partial debts.");
+  }
 
   const { error } = await supabase.from("payments").insert({
     debt_id: debtId,

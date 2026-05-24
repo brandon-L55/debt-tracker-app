@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { registerForNotificationsAsync } from "@/lib/services/notificationService";
 
 type AuthCtx = {
   session: Session | null;
@@ -20,14 +21,21 @@ const AuthContext = createContext<AuthCtx>({
 
 /** Upsert the current user's own profile row (id + email).
  *  Creates the row if missing; repairs email if null or stale. */
-function selfHealProfile(userId: string, rawEmail: string, label: string) {
+async function selfHealProfile(userId: string, rawEmail: string, label: string) {
   const email = rawEmail.trim().toLowerCase();
-  supabase
-    .from("profiles")
-    .upsert({ id: userId, email }, { onConflict: "id" })
-    .then(({ error }) => {
-      if (error) console.warn(`[WARN] profile self-heal upsert failure (${label}):`, error.message);
-    });
+  const expoPushToken = await registerForNotificationsAsync();
+
+  const result = expoPushToken
+    ? await supabase
+        .from("profiles")
+        .upsert({ id: userId, email, expo_push_token: expoPushToken }, { onConflict: "id" })
+    : await supabase
+        .from("profiles")
+        .upsert({ id: userId, email }, { onConflict: "id" });
+
+  if (result.error) {
+    console.warn(`[WARN] profile self-heal upsert failure (${label}):`, result.error.message);
+  }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -40,7 +48,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
       setIsLoading(false);
       if (session?.user?.email) {
-        selfHealProfile(session.user.id, session.user.email, "getSession");
+        selfHealProfile(session.user.id, session.user.email, "getSession").catch((error) => {
+          console.warn("[WARN] profile self-heal failure (getSession):", error);
+        });
       }
     });
 
@@ -48,7 +58,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       if (event === "SIGNED_IN" && session?.user?.email) {
-        selfHealProfile(session.user.id, session.user.email, "SIGNED_IN");
+        selfHealProfile(session.user.id, session.user.email, "SIGNED_IN").catch((error) => {
+          console.warn("[WARN] profile self-heal failure (SIGNED_IN):", error);
+        });
       }
     });
 

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import { getDebts, createDebt, updateDebtStatus as serviceUpdateDebtStatus, updateDebtDetails as serviceUpdateDebtDetails, cancelDebt as serviceCancelDebt, createPayment } from "@/lib/services/debtService";
 import type { CreateDebtInput, UpdateDebtDetailsInput } from "@/lib/services/debtService";
+import { showDebtNotification } from "@/lib/services/notificationService";
 
 export type Debt = {
   id: string;
@@ -83,6 +84,25 @@ type DebtContextType = {
 
 const DebtContext = createContext<DebtContextType | null>(null);
 
+type DebtRealtimeRow = {
+  id: string;
+  creator_id: string;
+  payer_user_id: string | null;
+  borrower_user_id: string | null;
+  amount_cents: number;
+  description: string | null;
+  status: Debt["status"];
+  due_date: string | null;
+  updated_at: string;
+};
+
+type PaymentRealtimeRow = {
+  id: string;
+  debt_id: string;
+  payer_user_id: string | null;
+  amount_cents: number;
+};
+
 function createClientRequestId(debtId: string) {
   return `payment:${debtId}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
 }
@@ -93,6 +113,8 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const debtsRef = useRef<Debt[]>([]);
   const paymentInFlightRef = useRef<Set<string>>(new Set());
+  const notifiedEventKeysRef = useRef<Set<string>>(new Set());
+  const localActionEventKeysRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     debtsRef.current = debts;
@@ -151,6 +173,94 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       return debtsRef.current.some((debt) => debt.id === debtId);
     }
 
+    function shouldNotify(eventKey: string) {
+      const localActionKey = [...localActionEventKeysRef.current].find((key) =>
+        eventKey.startsWith(key),
+      );
+      if (localActionKey) {
+        localActionEventKeysRef.current.delete(localActionKey);
+        notifiedEventKeysRef.current.add(eventKey);
+        return false;
+      }
+      if (notifiedEventKeysRef.current.has(eventKey)) return false;
+      notifiedEventKeysRef.current.add(eventKey);
+      return true;
+    }
+
+    function notifyDebtChange(userId: string, payload: { eventType: string; new: Partial<DebtRealtimeRow> }) {
+      const row = payload.new;
+      if (!row.id || !row.creator_id) return;
+
+      const isCreator = row.creator_id === userId;
+      const isLinkedParticipant = row.payer_user_id === userId || row.borrower_user_id === userId;
+      const debt = debtsRef.current.find((item) => item.id === row.id);
+      const person = debt?.person || "Someone";
+      const amount = row.amount_cents ? `$${(row.amount_cents / 100).toFixed(2)}` : "a debt";
+
+      if (payload.eventType === "INSERT") {
+        const eventKey = `debt:${row.id}:insert`;
+        if (row.status === "pending" && !isCreator && isLinkedParticipant && shouldNotify(eventKey)) {
+          showDebtNotification("New debt request", `${person} sent you ${amount}.`, {
+            debtId: row.id,
+            event: "debt_pending",
+          });
+        }
+        return;
+      }
+
+      if (payload.eventType !== "UPDATE" || !row.status) return;
+
+      const updateKey = `debt:${row.id}:status:${row.status}:${row.updated_at ?? ""}`;
+      if (row.status === "accepted" && isCreator && shouldNotify(updateKey)) {
+        showDebtNotification("Debt accepted", `${person} accepted ${amount}.`, {
+          debtId: row.id,
+          event: "debt_accepted",
+        });
+        return;
+      }
+
+      if (row.status === "rejected") {
+        if (isCreator && shouldNotify(updateKey)) {
+          showDebtNotification("Debt declined", `${person} declined ${amount}.`, {
+            debtId: row.id,
+            event: "debt_declined",
+          });
+        } else if (!isCreator && isLinkedParticipant && shouldNotify(updateKey)) {
+          showDebtNotification("Debt cancelled", `${person} cancelled ${amount}.`, {
+            debtId: row.id,
+            event: "debt_cancelled",
+          });
+        }
+        return;
+      }
+
+      const editKey = `debt:${row.id}:edit:${row.updated_at ?? ""}`;
+      if (row.status === "pending" && !isCreator && isLinkedParticipant && shouldNotify(editKey)) {
+        showDebtNotification("Debt updated", `${person} edited ${amount}.`, {
+          debtId: row.id,
+          event: "debt_edited",
+        });
+      }
+    }
+
+    function notifyPaymentChange(userId: string, payload: { eventType: string; new: Partial<PaymentRealtimeRow> }) {
+      const row = payload.new;
+      if (payload.eventType !== "INSERT" || !row.id || !row.debt_id) return;
+      if (row.payer_user_id === userId) return;
+      const debt = debtsRef.current.find((item) => item.id === row.debt_id);
+      if (!debt) return;
+
+      const eventKey = `payment:${row.id}:insert`;
+      if (!shouldNotify(eventKey)) return;
+
+      const amount = row.amount_cents ? `$${(row.amount_cents / 100).toFixed(2)}` : "a payment";
+      showDebtNotification("Payment made", `${debt.person || "Someone"} paid ${amount}.`, {
+        debtId: row.debt_id,
+        paymentId: row.id,
+        event: "payment_made",
+      });
+    }
+
     function stopRealtime() {
       if (refetchTimer) {
         clearTimeout(refetchTimer);
@@ -174,23 +284,35 @@ export function DebtProvider({ children }: { children: ReactNode }) {
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "debts", filter: `creator_id=eq.${userId}` },
-          scheduleRefetch,
+          (payload) => {
+            notifyDebtChange(userId, payload);
+            scheduleRefetch();
+          },
         )
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "debts", filter: `payer_user_id=eq.${userId}` },
-          scheduleRefetch,
+          (payload) => {
+            notifyDebtChange(userId, payload);
+            scheduleRefetch();
+          },
         )
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "debts", filter: `borrower_user_id=eq.${userId}` },
-          scheduleRefetch,
+          (payload) => {
+            notifyDebtChange(userId, payload);
+            scheduleRefetch();
+          },
         )
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "payments" },
           (payload) => {
-            if (paymentTouchesLoadedDebt(payload)) scheduleRefetch();
+            if (paymentTouchesLoadedDebt(payload)) {
+              notifyPaymentChange(userId, payload);
+              scheduleRefetch();
+            }
           },
         )
         .subscribe();
@@ -238,16 +360,19 @@ export function DebtProvider({ children }: { children: ReactNode }) {
   }
 
   async function updateDebtStatus(id: string, status: Debt["status"]) {
+    localActionEventKeysRef.current.add(`debt:${id}:status:${status}:`);
     await serviceUpdateDebtStatus(id, status);
     setDebts(prev => prev.map(d => d.id === id ? { ...d, status } : d));
   }
 
   async function updateDebtDetails(id: string, updates: UpdateDebtDetailsInput) {
+    localActionEventKeysRef.current.add(`debt:${id}:edit:`);
     const updated = await serviceUpdateDebtDetails(id, updates);
     setDebts(prev => prev.map(d => d.id === id ? updated : d));
   }
 
   async function cancelDebt(id: string) {
+    localActionEventKeysRef.current.add(`debt:${id}:status:rejected:`);
     await serviceCancelDebt(id);
     setDebts(prev => prev.map(d => d.id === id ? { ...d, status: "rejected" } : d));
   }

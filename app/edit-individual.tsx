@@ -70,7 +70,7 @@ export default function EditIndividualScreen() {
       notes: notes.trim(),
       imageUri: imageUri || undefined,
     });
-    router.back();
+    router.replace("/(tabs)/individuals");
   }
 
   return (

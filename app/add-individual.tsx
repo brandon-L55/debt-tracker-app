@@ -64,7 +64,7 @@ export default function AddIndividualScreen() {
         notes: notes.trim(),
         imageUri: imageUri || undefined,
       });
-      router.back();
+      router.replace("/(tabs)/individuals");
     } catch (e: unknown) {
       const msg =
         e instanceof Error

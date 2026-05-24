@@ -78,7 +78,7 @@ export default function AddGroupDebtScreen() {
         : member.name;
       addDebt({ person, amount: parseFloat(perPersonAmount.toFixed(2)), direction, reason: reason.trim(), groupId: resolvedGroupId, deadline: deadlineISO });
     }
-    router.back();
+    router.replace(resolvedGroupId ? (`/group/${resolvedGroupId}` as any) : "/(tabs)/groups");
   }
 
   const parsedAmount = parseFloat(amount) || 0;

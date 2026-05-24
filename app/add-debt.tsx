@@ -75,7 +75,7 @@ export default function AddDebtScreen() {
       for (const person of effectivePeople) {
         await addDebt({ person, amount: parseFloat(perPersonAmount.toFixed(2)), direction, reason: reason.trim(), deadline: deadlineISO });
       }
-      router.back();
+      router.replace("/(tabs)");
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Please try again.";
       Alert.alert("Could not save debt", msg);

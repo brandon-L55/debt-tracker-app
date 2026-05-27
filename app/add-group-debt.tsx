@@ -59,6 +59,7 @@ export default function AddGroupDebtScreen() {
   }
 
   function handleSave() {
+    if (!group) return;
     const parsedAmount = parseFloat(amount);
     if (!parsedAmount || parsedAmount <= 0) { Alert.alert("Invalid amount", "Please enter an amount greater than $0.00."); return; }
     if (selected.length === 0) { Alert.alert("No members selected", "Select at least one group member."); return; }
@@ -102,11 +103,11 @@ export default function AddGroupDebtScreen() {
           <Text style={[styles.label, { color: t.text, marginBottom: 0 }]}>Who is involved?</Text>
           {group.members.length > 0 && (
             <Pressable hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} onPress={() => {
-              const allSelected = group.members.every(m => selected.includes(m.name));
-              setSelected(allSelected ? [] : group.members.map(m => m.name));
+              const allSelected = group.members.every(m => selected.includes(m.id));
+              setSelected(allSelected ? [] : group.members.map(m => m.id));
             }}>
               <Text style={[styles.selectAllText, { color: t.primary }]}>
-                {group.members.every(m => selected.includes(m.name)) ? "Deselect All" : "Select All"}
+                {group.members.every(m => selected.includes(m.id)) ? "Deselect All" : "Select All"}
               </Text>
             </Pressable>
           )}

@@ -423,37 +423,43 @@ export function DebtProvider({ children }: { children: ReactNode }) {
 
   function markDebtsPaid(ids: string[]) {
     const idSet = new Set(ids);
-    setDebts(prev => prev.map(d => idSet.has(d.id) ? { ...d, status: "paid" } : d));
+    for (const id of idSet) {
+      const debt = debtsRef.current.find(d => d.id === id);
+      // Only the borrower can submit payments; skip debts the user is owed.
+      if (!debt || debt.direction !== "me") continue;
+      const amountCents = Math.round(debt.remainingAmount * 100);
+      if (amountCents <= 0) continue;
+      // addPayment handles its own optimistic update and the DB trigger
+      // sets paid_cents / status. Realtime sync is the source of truth.
+      addPayment(id, amountCents, createClientRequestId(id)).catch(e =>
+        console.error("markDebtsPaid: payment failed for", id, e)
+      );
+    }
   }
 
   function applyPartialPayment(personName: string, amount: number) {
-    setDebts(prev => {
-      const activeOwed = prev
-        .filter(d => d.person === personName && d.direction === "me" && d.status !== "paid" && d.status !== "rejected")
-        .sort((a, b) => a.amount - b.amount);
+    // Use the live ref so we read current remainingAmount, not stale closure state.
+    const activeOwed = debtsRef.current
+      .filter(d =>
+        d.person === personName &&
+        d.direction === "me" &&
+        (d.status === "accepted" || d.status === "partial")
+      )
+      .sort((a, b) => a.remainingAmount - b.remainingAmount);  // smallest balance first
 
-      let remaining = amount;
-      const paidIds = new Set<string>();
-      const partialUpdates = new Map<string, number>();
-
-      for (const debt of activeOwed) {
-        if (remaining <= 0) break;
-        if (remaining >= debt.amount) {
-          paidIds.add(debt.id);
-          remaining -= debt.amount;
-        } else {
-          partialUpdates.set(debt.id, parseFloat((debt.amount - remaining).toFixed(2)));
-          remaining = 0;
-        }
-      }
-
-      // TODO: preserve payment history record when history feature is implemented
-      return prev.map(d => {
-        if (paidIds.has(d.id)) return { ...d, status: "paid" };
-        if (partialUpdates.has(d.id)) return { ...d, amount: partialUpdates.get(d.id)!, status: "partial" as const };
-        return d;
-      });
-    });
+    let remaining = amount;
+    for (const debt of activeOwed) {
+      if (remaining <= 0) break;
+      // Pay at most what's left on this debt.
+      const toPay = Math.min(remaining, debt.remainingAmount);
+      const amountCents = Math.round(toPay * 100);
+      if (amountCents <= 0) continue;
+      remaining = parseFloat((remaining - toPay).toFixed(2));
+      // DB trigger decides whether the resulting status is "partial" or "paid".
+      addPayment(debt.id, amountCents, createClientRequestId(debt.id)).catch(e =>
+        console.error("applyPartialPayment: payment failed for", debt.id, e)
+      );
+    }
   }
 
   function reset() {

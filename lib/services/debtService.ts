@@ -450,14 +450,16 @@ export async function cancelDebt(id: string): Promise<void> {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError || !user) throw new Error("Not authenticated");
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("debts")
     .update({ status: "rejected" })
     .eq("id", id)
     .eq("creator_id", user.id)
-    .eq("status", "pending");
+    .eq("status", "pending")
+    .select("id");
 
   if (error) throw new Error(error.message);
+  if (!data || data.length === 0) throw new Error("Debt could not be cancelled — it may have already been accepted or cancelled.");
 }
 
 /**

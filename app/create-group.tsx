@@ -62,7 +62,7 @@ export default function CreateGroupScreen() {
         description: description.trim(),
         members,
       });
-      router.back();
+      router.replace("/(tabs)/groups");
     } catch (e: unknown) {
       const msg =
         e instanceof Error

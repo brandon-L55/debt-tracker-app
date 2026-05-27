@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { LinearGradient } from "expo-linear-gradient";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useDebts } from "@/context/DebtContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useRouter } from "expo-router";
@@ -64,16 +64,85 @@ function sortDebts(debts: Debt[], sort: DebtSortOption, td: string): Debt[] {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { debts } = useDebts();
+  const { debts, currentUserId, updateDebtStatus, updateDebtDetails, cancelDebt } = useDebts();
   const { colors: t, isDark } = useTheme();
+
+  async function handleAccept(id: string) {
+    try { await updateDebtStatus(id, "accepted"); }
+    catch (e: any) { Alert.alert("Error", e?.message ?? "Could not accept debt."); }
+  }
+  async function handleDecline(id: string) {
+    try { await updateDebtStatus(id, "rejected"); }
+    catch (e: any) { Alert.alert("Error", e?.message ?? "Could not decline debt."); }
+  }
   const [sort, setSort] = useState<DebtSortOption>("date");
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [visibleDebtCount, setVisibleDebtCount] = useState(10);
+  const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [editReason, setEditReason] = useState("");
+  const [editDeadline, setEditDeadline] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+
+  function openEditDebt(debt: Debt) {
+    setEditingDebt(debt);
+    setEditAmount(debt.amount.toFixed(2));
+    setEditReason(debt.reason);
+    setEditDeadline(debt.deadline ?? "");
+  }
+
+  async function handleSaveDebtEdit() {
+    if (!editingDebt || editSaving) return;
+    const amount = parseFloat(editAmount);
+    if (!amount || amount <= 0) {
+      Alert.alert("Invalid amount", "Please enter a positive amount.");
+      return;
+    }
+    if (editDeadline && !/^\d{4}-\d{2}-\d{2}$/.test(editDeadline)) {
+      Alert.alert("Invalid date", "Use YYYY-MM-DD or leave the date blank.");
+      return;
+    }
+    setEditSaving(true);
+    try {
+      await updateDebtDetails(editingDebt.id, {
+        amount,
+        reason: editReason.trim(),
+        deadline: editDeadline.trim() || null,
+      });
+      setEditingDebt(null);
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Could not update debt.");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  function handleCancelDebt(id: string) {
+    Alert.alert("Cancel debt?", "This will remove the pending request from active debt totals.", [
+      { text: "Keep", style: "cancel" },
+      {
+        text: "Cancel Debt",
+        style: "destructive",
+        onPress: async () => {
+          try { await cancelDebt(id); }
+          catch (e: any) { Alert.alert("Error", e?.message ?? "Could not cancel debt."); }
+        },
+      },
+    ]);
+  }
 
   const td = today();
-  const youOwe = debts.filter(d => d.direction === "me").reduce((s, d) => s + d.amount, 0);
-  const owedToYou = debts.filter(d => d.direction === "them").reduce((s, d) => s + d.amount, 0);
-  const displayDebts = useMemo(() => sortDebts(debts, sort, td), [debts, sort]);
+  // Accepted + partial debts count toward totals; use remainingAmount so paid-down
+  // balances are reflected and fully-paid debts are excluded.
+  const youOwe = debts
+    .filter(d => d.direction === "me" && (d.status === "accepted" || d.status === "partial"))
+    .reduce((s, d) => s + d.remainingAmount, 0);
+  const owedToYou = debts
+    .filter(d => d.direction === "them" && (d.status === "accepted" || d.status === "partial"))
+    .reduce((s, d) => s + d.remainingAmount, 0);
+  const totalPaid = debts.reduce((s, d) => s + d.totalPaidAmount, 0);
+  const totalReceived = debts.reduce((s, d) => s + d.totalReceivedAmount, 0);
+  const displayDebts = useMemo(() => sortDebts(debts, sort, td), [debts, sort, td]);
   const activeSortLabel = DEBT_SORT_OPTIONS.find(o => o.value === sort)?.label ?? "";
 
   const statCards = [
@@ -105,7 +174,7 @@ export default function HomeScreen() {
     },
     {
       label: "Total Paid",
-      value: "$0.00",
+      value: `$${totalPaid.toFixed(2)}`,
       valueColor: isDark ? "#A78BFA" : "#7C3AED",
       gradient: isDark
         ? ["rgba(124,58,237,0.38)", "rgba(10,13,32,0.96)"] as [string, string]
@@ -118,7 +187,7 @@ export default function HomeScreen() {
     },
     {
       label: "Total Received",
-      value: "$0.00",
+      value: `$${totalReceived.toFixed(2)}`,
       valueColor: isDark ? "#FF4ECD" : "#EC4899",
       gradient: isDark
         ? ["rgba(255,78,205,0.28)", "rgba(6,214,160,0.20)"] as [string, string]
@@ -187,23 +256,65 @@ export default function HomeScreen() {
               {displayDebts.slice(0, visibleDebtCount).map(debt => {
                 const dl = dlInfo(debt.deadline, td);
                 const isOwedToMe = debt.direction === "them";
+                const showActions = debt.status === "pending" && !!currentUserId && debt.creatorId !== currentUserId;
+                const showCreatorActions = debt.status === "pending" && !!currentUserId && debt.creatorId === currentUserId;
                 return (
                   <View key={debt.id} style={[styles.debtRow, {
                     backgroundColor: t.card,
-                    borderColor: t.border,
+                    borderColor: showActions || showCreatorActions ? t.primaryBorder : t.border,
                     ...(isDark ? { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 3 } : { shadowColor: "#7C3AED", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 1 }),
                   }]}>
-                    <View style={styles.debtLeft}>
-                      <Text style={[styles.debtPerson, { color: t.text }]}>{debt.person}</Text>
-                      {debt.reason ? <Text style={[styles.debtReason, { color: t.textSub }]}>{debt.reason}</Text> : null}
-                      {dl ? <Text style={[styles.dlLabel, { color: dl.overdue ? t.red : t.primary }]}>{dl.label}{dl.overdue ? " · Overdue" : ""}</Text> : null}
+                    <View style={styles.debtRowContent}>
+                      <View style={styles.debtLeft}>
+                        <Text style={[styles.debtPerson, { color: t.text }]}>{debt.person}</Text>
+                        {debt.reason ? <Text style={[styles.debtReason, { color: t.textSub }]}>{debt.reason}</Text> : null}
+                        {debt.status === "pending" && (
+                          <Text style={[styles.pendingBadge, { color: t.textMuted }]}>⏳ Pending verification</Text>
+                        )}
+                        {dl ? <Text style={[styles.dlLabel, { color: dl.overdue ? t.red : t.primary }]}>{dl.label}{dl.overdue ? " · Overdue" : ""}</Text> : null}
+                      </View>
+                      <View style={styles.debtRight}>
+                        <Text style={[styles.debtAmount, { color: isOwedToMe ? t.green : t.red }]}>
+                          {isOwedToMe ? "+" : "-"}${debt.remainingAmount.toFixed(2)}
+                        </Text>
+                        {debt.status === "partial" && (
+                          <Text style={[styles.debtOrig, { color: t.textMuted }]}>of ${debt.amount.toFixed(2)}</Text>
+                        )}
+                        <Text style={[styles.debtDir, { color: t.textMuted }]}>{isOwedToMe ? "Owes you" : "You owe"}</Text>
+                      </View>
                     </View>
-                    <View style={styles.debtRight}>
-                      <Text style={[styles.debtAmount, { color: isOwedToMe ? t.green : t.red }]}>
-                        {isOwedToMe ? "+" : "-"}${debt.amount.toFixed(2)}
-                      </Text>
-                      <Text style={[styles.debtDir, { color: t.textMuted }]}>{isOwedToMe ? "Owes you" : "You owe"}</Text>
-                    </View>
+                    {showActions && (
+                      <View style={styles.debtActionRow}>
+                        <Pressable
+                          style={[styles.debtActionBtn, { backgroundColor: t.greenSoft, borderColor: t.greenBorder }]}
+                          onPress={() => handleAccept(debt.id)}
+                        >
+                          <Text style={[styles.debtActionText, { color: t.green }]}>✓ Accept</Text>
+                        </Pressable>
+                        <Pressable
+                          style={[styles.debtActionBtn, { backgroundColor: t.redSoft, borderColor: t.redBorder }]}
+                          onPress={() => handleDecline(debt.id)}
+                        >
+                          <Text style={[styles.debtActionText, { color: t.red }]}>✗ Decline</Text>
+                        </Pressable>
+                      </View>
+                    )}
+                    {showCreatorActions && (
+                      <View style={styles.debtActionRow}>
+                        <Pressable
+                          style={[styles.debtActionBtn, { backgroundColor: t.primarySoft, borderColor: t.primaryBorder }]}
+                          onPress={() => openEditDebt(debt)}
+                        >
+                          <Text style={[styles.debtActionText, { color: t.primary }]}>Edit</Text>
+                        </Pressable>
+                        <Pressable
+                          style={[styles.debtActionBtn, { backgroundColor: t.redSoft, borderColor: t.redBorder }]}
+                          onPress={() => handleCancelDebt(debt.id)}
+                        >
+                          <Text style={[styles.debtActionText, { color: t.red }]}>Cancel</Text>
+                        </Pressable>
+                      </View>
+                    )}
                   </View>
                 );
               })}
@@ -255,6 +366,55 @@ export default function HomeScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <Modal visible={editingDebt !== null} transparent animationType="fade" onRequestClose={() => { if (!editSaving) setEditingDebt(null); }}>
+        <Pressable style={styles.overlay} onPress={() => { if (!editSaving) setEditingDebt(null); }}>
+          <Pressable style={[styles.editModal, { backgroundColor: t.elevatedCard, borderColor: t.border }]} onPress={e => e.stopPropagation()}>
+            <Text style={[styles.editTitle, { color: t.text }]}>Edit Pending Debt</Text>
+            <TextInput
+              style={[styles.editInput, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
+              placeholder="Amount"
+              placeholderTextColor={t.textMuted}
+              keyboardType="decimal-pad"
+              value={editAmount}
+              onChangeText={setEditAmount}
+              editable={!editSaving}
+            />
+            <TextInput
+              style={[styles.editInput, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
+              placeholder="Reason"
+              placeholderTextColor={t.textMuted}
+              value={editReason}
+              onChangeText={setEditReason}
+              editable={!editSaving}
+            />
+            <TextInput
+              style={[styles.editInput, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
+              placeholder="Due date (YYYY-MM-DD)"
+              placeholderTextColor={t.textMuted}
+              value={editDeadline}
+              onChangeText={setEditDeadline}
+              editable={!editSaving}
+            />
+            <View style={styles.editActions}>
+              <Pressable
+                style={[styles.editBtn, { backgroundColor: t.card, borderColor: t.border }]}
+                onPress={() => setEditingDebt(null)}
+                disabled={editSaving}
+              >
+                <Text style={[styles.editBtnText, { color: t.text }]}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.editBtn, { backgroundColor: t.primarySoft, borderColor: t.primaryBorder, opacity: editSaving ? 0.6 : 1 }]}
+                onPress={handleSaveDebtEdit}
+                disabled={editSaving}
+              >
+                <Text style={[styles.editBtnText, { color: t.primary }]}>{editSaving ? "Saving..." : "Save"}</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ScrollView>
   );
 }
@@ -278,14 +438,20 @@ const styles = StyleSheet.create({
   sortHint: { fontSize: 12, marginBottom: 10 },
   emptyFiltered: { padding: 20, alignItems: "center" },
   emptyFilteredText: { fontSize: 14, fontStyle: "italic" },
-  debtRow: { borderRadius: 18, padding: 16, marginBottom: 10, borderWidth: 1, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  debtRow: { borderRadius: 18, padding: 16, marginBottom: 10, borderWidth: 1 },
+  debtRowContent: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   debtLeft: { flex: 1, marginRight: 12 },
   debtPerson: { fontSize: 16, fontWeight: "700" },
   debtReason: { fontSize: 13, marginTop: 2 },
+  pendingBadge: { fontSize: 11, marginTop: 3, fontWeight: "500" },
   dlLabel: { fontSize: 11, marginTop: 3, fontWeight: "600" },
   debtRight: { alignItems: "flex-end" },
   debtAmount: { fontSize: 18, fontWeight: "800" },
+  debtOrig: { fontSize: 11, marginTop: 1 },
   debtDir: { fontSize: 12, marginTop: 2 },
+  debtActionRow: { flexDirection: "row", gap: 8, marginTop: 12 },
+  debtActionBtn: { flex: 1, borderRadius: 10, borderWidth: 1, paddingVertical: 8, alignItems: "center" },
+  debtActionText: { fontSize: 13, fontWeight: "700" },
   loadMoreBtn: { borderRadius: 14, borderWidth: 1, padding: 14, alignItems: "center", marginBottom: 10 },
   loadMoreText: { fontSize: 15, fontWeight: "600" },
   collapseRow: { flexDirection: "row", gap: 8, marginBottom: 10 },
@@ -297,4 +463,10 @@ const styles = StyleSheet.create({
   menuRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, marginHorizontal: 8, borderRadius: 12 },
   menuRowText: { flex: 1, fontSize: 15 },
   menuCheck: { fontSize: 15, fontWeight: "700" },
+  editModal: { width: 320, borderRadius: 20, borderWidth: 1, padding: 24, gap: 12 },
+  editTitle: { fontSize: 18, fontWeight: "700" },
+  editInput: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16 },
+  editActions: { flexDirection: "row", gap: 10 },
+  editBtn: { flex: 1, borderRadius: 12, borderWidth: 1, paddingVertical: 12, alignItems: "center" },
+  editBtnText: { fontSize: 15, fontWeight: "700" },
 });

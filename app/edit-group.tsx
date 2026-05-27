@@ -93,7 +93,7 @@ export default function EditGroupScreen() {
       members,
       imageUri: imageUri || undefined,
     });
-    router.back();
+    router.replace("/(tabs)/groups");
   }
 
   return (

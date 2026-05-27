@@ -23,8 +23,9 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
 ];
 
 function calcNetBalance(name: string, debts: Debt[]): number {
-  return debts.filter(d => d.person === name)
-    .reduce((s, d) => s + (d.direction === "them" ? d.amount : -d.amount), 0);
+  return debts
+    .filter(d => d.person === name && (d.status === "accepted" || d.status === "partial"))
+    .reduce((s, d) => s + (d.direction === "them" ? d.remainingAmount : -d.remainingAmount), 0);
 }
 
 function latestDebtDate(name: string, debts: Debt[]): number {

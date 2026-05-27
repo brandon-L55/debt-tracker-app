@@ -1,5 +1,7 @@
 import { supabase } from "@/lib/supabase";
-import type { Group, GroupMember } from "@/context/DebtContext";
+import type { Group, GroupMember, Individual } from "@/context/DebtContext";
+import { normalizePhone } from "@/lib/phoneUtils";
+import { findOrCreateContact } from "./contactsService";
 
 // ─── Row shapes returned by Supabase ─────────────────────────
 
@@ -34,7 +36,24 @@ function rowToGroupMember(row: GroupMemberRow): GroupMember {
     id: row.id,
     name: row.display_name ?? "",
     phoneOrUsername: row.phone_or_username ?? "",
+    contactId: row.contact_id ?? undefined,
   };
+}
+
+/**
+ * Find or create a contact for a group member.
+ * Phone → normalized match; username → exact match; empty → null.
+ * Returns the Individual so callers can collect newly created contacts.
+ */
+async function resolveContact(name: string, phoneOrUsername: string): Promise<Individual | null> {
+  const val = phoneOrUsername.trim();
+  if (!val) return null;
+  try {
+    return await findOrCreateContact(name, val);
+  } catch (e) {
+    console.error("[groupService] Could not link member to contact:", e);
+    return null;
+  }
 }
 
 function rowToGroup(row: GroupRow, members: GroupMember[]): Group {
@@ -92,7 +111,7 @@ export async function getGroupById(id: string): Promise<Group | null> {
 export async function createGroup(
   group: Omit<Group, "id" | "createdAt">,
   sortOrder: number
-): Promise<Group> {
+): Promise<{ group: Group; newContacts: Individual[] }> {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError || !user) throw new Error("Must be logged in to create groups.");
 
@@ -124,13 +143,21 @@ export async function createGroup(
 
   const groupRow = groupData as GroupRow;
 
-  // 2. Insert members (if any).
+  // 2. Insert members (if any), linking each to a contact by phone/username.
   let members: GroupMember[] = [];
+  const newContacts: Individual[] = [];
+
   if (group.members.length > 0) {
-    const memberInserts = group.members.map(m => ({
+    const resolved = await Promise.all(
+      group.members.map(m => resolveContact(m.name, m.phoneOrUsername))
+    );
+    newContacts.push(...(resolved.filter(Boolean) as Individual[]));
+
+    const memberInserts = group.members.map((m, i) => ({
       group_id: groupRow.id,
       display_name: m.name,
-      phone_or_username: m.phoneOrUsername || null,
+      phone_or_username: normalizePhone(m.phoneOrUsername || "") || null,
+      contact_id: resolved[i]?.id ?? null,
       role: "member",
     }));
     const { data: memberData, error: memberError } = await supabase
@@ -139,13 +166,12 @@ export async function createGroup(
       .select();
     if (memberError) {
       console.error("CREATE GROUP MEMBERS ERROR:", JSON.stringify(memberError, null, 2));
-      // Group was created successfully; members can be added later via edit.
     } else {
       members = (memberData as GroupMemberRow[]).map(rowToGroupMember);
     }
   }
 
-  return rowToGroup(groupRow, members);
+  return { group: rowToGroup(groupRow, members), newContacts };
 }
 
 /**
@@ -155,8 +181,9 @@ export async function createGroup(
 export async function updateGroup(
   id: string,
   updates: Partial<Omit<Group, "id" | "createdAt">>
-): Promise<void> {
-  // Build the groups-table patch (only provided scalars).
+): Promise<Individual[]> {
+  const newContacts: Individual[] = [];
+
   const patch: Record<string, unknown> = {};
   if (updates.name !== undefined) patch.name = updates.name;
   if (updates.description !== undefined) patch.description = updates.description || null;
@@ -169,7 +196,6 @@ export async function updateGroup(
     if (error) throw new Error(error.message);
   }
 
-  // Replace members if a new list was provided.
   if (updates.members !== undefined) {
     const { error: delError } = await supabase
       .from("group_members")
@@ -178,10 +204,16 @@ export async function updateGroup(
     if (delError) throw new Error(delError.message);
 
     if (updates.members.length > 0) {
-      const memberInserts = updates.members.map(m => ({
+      const resolved = await Promise.all(
+        updates.members.map(m => resolveContact(m.name, m.phoneOrUsername))
+      );
+      newContacts.push(...(resolved.filter(Boolean) as Individual[]));
+
+      const memberInserts = updates.members.map((m, i) => ({
         group_id: id,
         display_name: m.name,
-        phone_or_username: m.phoneOrUsername || null,
+        phone_or_username: normalizePhone(m.phoneOrUsername || "") || null,
+        contact_id: resolved[i]?.id ?? null,
         role: "member",
       }));
       const { error: insError } = await supabase
@@ -190,6 +222,8 @@ export async function updateGroup(
       if (insError) throw new Error(insError.message);
     }
   }
+
+  return newContacts;
 }
 
 /**

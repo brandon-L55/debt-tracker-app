@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Alert, Dimensions, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Dimensions, InputAccessoryView, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useDebts } from "@/context/DebtContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -80,9 +80,13 @@ export default function AddDebtScreen() {
   const parsedAmount = parseFloat(amount) || 0;
   const splitAmount = people.length > 0 ? parsedAmount / (people.length + 1) : 0;
   const deadlinePreview = previewDeadline(deadline);
+  const ACCESSORY_PERSON = "add-debt-person";
+  const ACCESSORY_AMOUNT = "add-debt-amount";
+  const ACCESSORY_REASON = "add-debt-reason";
+  const ACCESSORY_DEADLINE = "add-debt-deadline";
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: t.bg }} behavior="height" enabled={Platform.OS === "android"}>
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
       <ScrollView
         ref={scrollRef}
         onScroll={e => { scrollY.current = e.nativeEvent.contentOffset.y; }}
@@ -102,6 +106,7 @@ export default function AddDebtScreen() {
           <Text style={[styles.label, { color: t.text }]}>People</Text>
           <TextInput
             style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
+            inputAccessoryViewID={ACCESSORY_PERSON}
             placeholder="Name, phone, or @username"
             placeholderTextColor={t.textMuted}
             value={personInput}
@@ -131,6 +136,7 @@ export default function AddDebtScreen() {
           <Text style={[styles.label, { color: t.text }]}>Amount</Text>
           <TextInput
             style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
+            inputAccessoryViewID={ACCESSORY_AMOUNT}
             placeholder="0.00"
             placeholderTextColor={t.textMuted}
             keyboardType="decimal-pad"
@@ -186,6 +192,7 @@ export default function AddDebtScreen() {
           <Text style={[styles.label, { color: t.text }]}>Reason <Text style={[styles.labelOptional, { color: t.textMuted }]}>(optional)</Text></Text>
           <TextInput
             style={[styles.input, styles.textArea, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
+            inputAccessoryViewID={ACCESSORY_REASON}
             placeholder="Dinner, tickets, Uber, rent, etc."
             placeholderTextColor={t.textMuted}
             multiline
@@ -215,6 +222,7 @@ export default function AddDebtScreen() {
           <View style={styles.deadlineRow}>
             <TextInput
               style={[styles.input, styles.deadlineInput, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
+              inputAccessoryViewID={ACCESSORY_DEADLINE}
               placeholder="MM/DD/YYYY"
               placeholderTextColor={t.textMuted}
               value={deadline}
@@ -231,18 +239,26 @@ export default function AddDebtScreen() {
           {deadlinePreview ? <Text style={[styles.dlPreview, { color: t.primary }]}>📅 {deadlinePreview}</Text> : null}
         </View>
 
-        <GradientButton
-          label="Save Debt"
-          onPress={handleSave}
-          style={{ marginTop: 10, marginBottom: 40 }}
-        />
       </ScrollView>
-    </KeyboardAvoidingView>
+      <View style={[styles.saveBar, { backgroundColor: t.bg, borderTopColor: t.border }]}>
+        <GradientButton label="Save Debt" onPress={handleSave} />
+      </View>
+      {Platform.OS === "ios" && [ACCESSORY_PERSON, ACCESSORY_AMOUNT, ACCESSORY_REASON, ACCESSORY_DEADLINE].map(id => (
+        <InputAccessoryView key={id} nativeID={id}>
+          <View style={[styles.accessory, { backgroundColor: t.card, borderTopColor: t.border }]}>
+            <Pressable onPress={Keyboard.dismiss} hitSlop={8}>
+              <Text style={[styles.accessoryDone, { color: t.primary }]}>Done</Text>
+            </Pressable>
+          </View>
+        </InputAccessoryView>
+      ))}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 20, paddingBottom: 160, flexGrow: 1 },
+  content: { padding: 20, paddingBottom: 24, flexGrow: 1 },
+  saveBar: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24, borderTopWidth: 1 },
   title: { fontSize: 32, fontWeight: "800", marginTop: 40, letterSpacing: -0.5 },
   subtitle: { fontSize: 15, marginBottom: 28, marginTop: 6 },
   formGroup: { marginBottom: 22 },
@@ -269,4 +285,6 @@ const styles = StyleSheet.create({
   clearBtn: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 },
   clearBtnText: { fontSize: 14, fontWeight: "600" },
   dlPreview: { fontSize: 13, marginTop: 6, fontWeight: "500" },
+  accessory: { flexDirection: "row", justifyContent: "flex-end", paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1 },
+  accessoryDone: { fontSize: 16, fontWeight: "600" },
 });

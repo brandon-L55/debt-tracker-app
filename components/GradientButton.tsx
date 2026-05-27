@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { LinearGradient } from "expo-linear-gradient";
 import { Pressable, StyleSheet, Text, ViewStyle } from "react-native";
 import { useTheme } from "@/context/ThemeContext";
+import { glow } from "@/constants/effects";
 
 type Props = {
   label: string;
@@ -10,22 +12,29 @@ type Props = {
 };
 
 export function GradientButton({ label, onPress, disabled, style }: Props) {
-  const { isDark } = useTheme();
+  const { colors: t } = useTheme();
+  const [pressed, setPressed] = useState(false);
 
-  const glow = isDark
-    ? { shadowColor: "#FF4ECD", shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.55, shadowRadius: 18, elevation: 12 }
-    : { shadowColor: "#7C3AED", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.28, shadowRadius: 12, elevation: 6 };
+  const shadow = pressed ? glow(t.from, "strong") : glow(t.from, "medium");
 
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
-      style={[styles.wrapper, glow, style, disabled ? { opacity: 0.6 } : undefined]}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      style={[
+        styles.wrapper,
+        shadow,
+        style,
+        disabled && { opacity: 0.5 },
+        pressed && { transform: [{ translateY: -1 }] },
+      ]}
     >
       <LinearGradient
-        colors={isDark ? ["#6D28D9", "#FF3EA5"] : ["#7C3AED", "#EC4899"]}
+        colors={[t.from, t.to] as [string, string]}
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
+        end={{ x: 1, y: 1 }}
         style={styles.gradient}
       >
         <Text style={styles.text}>{label}</Text>
@@ -35,7 +44,7 @@ export function GradientButton({ label, onPress, disabled, style }: Props) {
 }
 
 const styles = StyleSheet.create({
-  wrapper: { borderRadius: 20 },
-  gradient: { padding: 18, borderRadius: 20, alignItems: "center" },
-  text: { color: "#FFFFFF", fontSize: 17, fontWeight: "700", letterSpacing: 0.2 },
+  wrapper: { borderRadius: 16 },
+  gradient: { height: 52, paddingHorizontal: 18, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  text: { color: "#FFFFFF", fontSize: 16, fontWeight: "700", letterSpacing: -0.2 },
 });

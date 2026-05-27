@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, InputAccessoryView, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useDebts } from "@/context/DebtContext";
 import { useGroups } from "@/context/GroupsContext";
@@ -38,7 +38,7 @@ export default function AddGroupDebtScreen() {
   const [selected, setSelected] = useState<string[]>([]);
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
-  const [direction, setDirection] = useState<"them" | "me">("them");
+  const [direction, setDirection] = useState<"them" | "me" | null>(null);
   const [splitEvenly, setSplitEvenly] = useState(false);
   const [deadline, setDeadline] = useState("");
 
@@ -58,6 +58,7 @@ export default function AddGroupDebtScreen() {
     const parsedAmount = parseFloat(amount);
     if (!parsedAmount || parsedAmount <= 0) { Alert.alert("Invalid amount", "Please enter an amount greater than $0.00."); return; }
     if (selected.length === 0) { Alert.alert("No members selected", "Select at least one group member."); return; }
+    if (!direction) { Alert.alert("No direction selected", "Choose who owes who before saving."); return; }
     let deadlineISO: string | null = null;
     if (deadline.trim()) {
       deadlineISO = parseDeadlineInput(deadline);
@@ -75,15 +76,31 @@ export default function AddGroupDebtScreen() {
   const splitAmount = selected.length > 0 ? parsedAmount / (selected.length + 1) : 0;
   const deadlinePreview = previewDeadline(deadline);
 
+  const ACCESSORY_AMOUNT = "add-group-debt-amount";
+  const ACCESSORY_REASON = "add-group-debt-reason";
+  const ACCESSORY_DEADLINE = "add-group-debt-deadline";
+
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: t.bg }} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 110 : 20}>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"} showsVerticalScrollIndicator={false}>
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content} automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"} showsVerticalScrollIndicator={false}>
       <Text style={[styles.title, { color: t.text }]}>Add Group Debt</Text>
       <Text style={[styles.subtitle, { color: t.textSub }]}>{group.name}</Text>
 
       {/* Members */}
       <View style={styles.formGroup}>
-        <Text style={[styles.label, { color: t.text }]}>Who is involved?</Text>
+        <View style={styles.labelRow}>
+          <Text style={[styles.label, { color: t.text, marginBottom: 0 }]}>Who is involved?</Text>
+          {group.members.length > 0 && (
+            <Pressable hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} onPress={() => {
+              const allSelected = group.members.every(m => selected.includes(m.name));
+              setSelected(allSelected ? [] : group.members.map(m => m.name));
+            }}>
+              <Text style={[styles.selectAllText, { color: t.primary }]}>
+                {group.members.every(m => selected.includes(m.name)) ? "Deselect All" : "Select All"}
+              </Text>
+            </Pressable>
+          )}
+        </View>
         <View style={styles.chips}>
           {group.members.map(m => {
             const sel = selected.includes(m.name);
@@ -106,6 +123,7 @@ export default function AddGroupDebtScreen() {
         <Text style={[styles.label, { color: t.text }]}>Amount</Text>
         <TextInput
           style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
+          inputAccessoryViewID={ACCESSORY_AMOUNT}
           placeholder="0.00"
           placeholderTextColor={t.textMuted}
           keyboardType="decimal-pad"
@@ -121,7 +139,7 @@ export default function AddGroupDebtScreen() {
           <Pressable
             key={opt}
             style={[styles.optionBtn, { backgroundColor: direction === opt ? t.primarySoft : t.card, borderColor: direction === opt ? t.primary : t.border }, { marginBottom: 10 }]}
-            onPress={() => setDirection(opt)}
+            onPress={() => setDirection(prev => prev === opt ? null : opt)}
           >
             <Text style={[styles.optionText, { color: direction === opt ? t.primary : t.text }]}>
               {opt === "them" ? "They owe me" : "I owe them"}
@@ -151,6 +169,7 @@ export default function AddGroupDebtScreen() {
         <Text style={[styles.label, { color: t.text }]}>Reason <Text style={[styles.labelOptional, { color: t.textMuted }]}>(optional)</Text></Text>
         <TextInput
           style={[styles.input, styles.textArea, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
+          inputAccessoryViewID={ACCESSORY_REASON}
           placeholder="Dinner, hotel, activity, etc."
           placeholderTextColor={t.textMuted}
           multiline
@@ -167,6 +186,7 @@ export default function AddGroupDebtScreen() {
         <View style={styles.deadlineRow}>
           <TextInput
             style={[styles.input, styles.deadlineInput, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
+            inputAccessoryViewID={ACCESSORY_DEADLINE}
             placeholder="MM/DD/YYYY"
             placeholderTextColor={t.textMuted}
             value={deadline}
@@ -183,18 +203,26 @@ export default function AddGroupDebtScreen() {
         {deadlinePreview ? <Text style={[styles.dlPreview, { color: t.primary }]}>📅 {deadlinePreview}</Text> : null}
       </View>
 
-      <GradientButton
-        label="Save Debt"
-        onPress={handleSave}
-        style={{ marginTop: 10, marginBottom: 40 }}
-      />
-    </ScrollView>
-    </KeyboardAvoidingView>
+      </ScrollView>
+      <View style={[styles.saveBar, { backgroundColor: t.bg, borderTopColor: t.border }]}>
+        <GradientButton label="Save Debt" onPress={handleSave} />
+      </View>
+      {Platform.OS === "ios" && [ACCESSORY_AMOUNT, ACCESSORY_REASON, ACCESSORY_DEADLINE].map(id => (
+        <InputAccessoryView key={id} nativeID={id}>
+          <View style={[styles.accessory, { backgroundColor: t.card, borderTopColor: t.border }]}>
+            <Pressable onPress={Keyboard.dismiss} hitSlop={8}>
+              <Text style={[styles.accessoryDone, { color: t.primary }]}>Done</Text>
+            </Pressable>
+          </View>
+        </InputAccessoryView>
+      ))}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 20, paddingBottom: 260, flexGrow: 1 },
+  content: { padding: 20, paddingBottom: 24, flexGrow: 1 },
+  saveBar: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24, borderTopWidth: 1 },
   title: { fontSize: 32, fontWeight: "700", marginTop: 40 },
   subtitle: { fontSize: 16, marginBottom: 28 },
   formGroup: { marginBottom: 22 },
@@ -202,6 +230,8 @@ const styles = StyleSheet.create({
   labelOptional: { fontSize: 14, fontWeight: "400" },
   input: { borderRadius: 14, padding: 16, fontSize: 16, borderWidth: 1 },
   textArea: { minHeight: 100, textAlignVertical: "top" },
+  labelRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
+  selectAllText: { fontSize: 14, fontWeight: "600" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   chip: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1.5 },
   chipText: { fontSize: 14, fontWeight: "600" },
@@ -219,4 +249,6 @@ const styles = StyleSheet.create({
   clearBtn: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10 },
   clearBtnText: { fontSize: 14, fontWeight: "600" },
   dlPreview: { fontSize: 13, marginTop: 6, fontWeight: "500" },
+  accessory: { flexDirection: "row", justifyContent: "flex-end", paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1 },
+  accessoryDone: { fontSize: 16, fontWeight: "600" },
 });

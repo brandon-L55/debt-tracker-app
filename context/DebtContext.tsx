@@ -8,7 +8,7 @@ export type Debt = {
   amount: number;
   direction: "them" | "me";
   reason: string;
-  status: "pending" | "accepted" | "rejected" | "paid" | "disputed";
+  status: "pending" | "accepted" | "rejected" | "paid" | "disputed" | "partially_paid";
   createdAt: string;
   groupId?: string;
   deadline?: string | null;
@@ -54,6 +54,10 @@ type DebtContextType = {
   addDebt: (debt: Omit<Debt, "id" | "createdAt" | "status"> & { status?: Debt["status"] }) => void;
   /** Renames a person string inside all local debts. Called by ContactsContext and GroupsContext when a name changes. */
   renameDebtPerson: (oldName: string, newName: string) => void;
+  /** Marks the given debt IDs as paid. Used by the Pay All action on individual/group screens. */
+  markDebtsPaid: (ids: string[]) => void;
+  /** Applies a partial payment amount against a person's active owed debts, oldest-first. Fully paid debts are marked paid; the last debt may be partially reduced. */
+  applyPartialPayment: (personName: string, amount: number) => void;
   reset: () => void;
   isLoading: boolean;
 };
@@ -100,6 +104,41 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     );
   }
 
+  function markDebtsPaid(ids: string[]) {
+    const idSet = new Set(ids);
+    setDebts(prev => prev.map(d => idSet.has(d.id) ? { ...d, status: "paid" } : d));
+  }
+
+  function applyPartialPayment(personName: string, amount: number) {
+    setDebts(prev => {
+      const activeOwed = prev
+        .filter(d => d.person === personName && d.direction === "me" && d.status !== "paid" && d.status !== "rejected")
+        .sort((a, b) => a.amount - b.amount);
+
+      let remaining = amount;
+      const paidIds = new Set<string>();
+      const partialUpdates = new Map<string, number>();
+
+      for (const debt of activeOwed) {
+        if (remaining <= 0) break;
+        if (remaining >= debt.amount) {
+          paidIds.add(debt.id);
+          remaining -= debt.amount;
+        } else {
+          partialUpdates.set(debt.id, parseFloat((debt.amount - remaining).toFixed(2)));
+          remaining = 0;
+        }
+      }
+
+      // TODO: preserve payment history record when history feature is implemented
+      return prev.map(d => {
+        if (paidIds.has(d.id)) return { ...d, status: "paid" };
+        if (partialUpdates.has(d.id)) return { ...d, amount: partialUpdates.get(d.id)!, status: "partially_paid" as const };
+        return d;
+      });
+    });
+  }
+
   function reset() {
     setDebts([]);
   }
@@ -108,6 +147,8 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     <DebtContext.Provider value={{
       debts, addDebt,
       renameDebtPerson,
+      markDebtsPaid,
+      applyPartialPayment,
       reset,
       isLoading,
     }}>

@@ -408,7 +408,16 @@ export default function IndividualDashboardScreen() {
                       <Text style={styles.statusText}>{statusLabel(debt.status)}</Text>
                     </View>
                   </View>
-                  {dl ? <Text style={[styles.dlLabel, { color: dl.overdue ? t.red : t.primary }]}>{dl.label}{dl.overdue ? " · Overdue" : ""}</Text> : null}
+                  <View style={styles.txDueRow}>
+                    <Text style={styles.txDueIcon}>📅</Text>
+                    {dl ? (
+                      <Text style={[styles.txDueText, { color: dl.overdue ? t.red : t.primary }]}>
+                        {dl.label}{dl.overdue ? " · Overdue" : ""}
+                      </Text>
+                    ) : (
+                      <Text style={[styles.txDueText, { color: t.textMuted }]}>Due N/A</Text>
+                    )}
+                  </View>
                 </View>
                 <View style={styles.txRight}>
                   <Text style={[styles.txAmount, { color: debt.direction === "me" ? t.red : t.green }]}>
@@ -418,6 +427,17 @@ export default function IndividualDashboardScreen() {
                     <Text style={[styles.txOrig, { color: t.textMuted }]}>of ${debt.amount.toFixed(2)}</Text>
                   )}
                   <Text style={[styles.txDir, { color: t.textSub }]}>{debt.direction === "me" ? "You owe" : "Owes you"}</Text>
+                  {canMakePayment && (
+                    <Pressable
+                      style={[styles.txPayPill, { opacity: paymentSavingIds.has(debt.id) ? 0.6 : 1 }]}
+                      onPress={() => openPayModal(debt.id, debt.remainingAmount, debt.deadline)}
+                      disabled={paymentSavingIds.has(debt.id)}
+                    >
+                      <LinearGradient colors={[t.from, t.to] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.txPayPillGrad}>
+                        <Text style={styles.txPayPillText}>✓ Pay debt</Text>
+                      </LinearGradient>
+                    </Pressable>
+                  )}
                 </View>
               </View>
               {showActions && (
@@ -440,36 +460,27 @@ export default function IndividualDashboardScreen() {
                   </Pressable>
                 </View>
               )}
-              {canMakePayment && (
-                <View style={styles.txActionRow}>
+              {canMarkManually && (
+                <View style={styles.txMarkPaidRow}>
                   <Pressable
-                    style={[styles.txActionBtn, { backgroundColor: t.primarySoft, borderColor: t.primaryBorder, opacity: paymentSavingIds.has(debt.id) ? 0.6 : 1 }]}
-                    onPress={() => openPayModal(debt.id, debt.remainingAmount, debt.deadline)}
-                    disabled={paymentSavingIds.has(debt.id)}
+                    style={[styles.txMarkPaidPill, { backgroundColor: t.greenSoft, borderColor: t.greenBorder, opacity: markPaidSavingIds.has(debt.id) ? 0.6 : 1 }]}
+                    onPress={() => handleMarkPaidManually(debt.id)}
+                    disabled={markPaidSavingIds.has(debt.id)}
                   >
-                    <Text style={[styles.txActionText, { color: t.primary }]}>💳 Pay Debt</Text>
+                    <Text style={[styles.txMarkPaidText, { color: t.green }]}>
+                      {markPaidSavingIds.has(debt.id) ? "Saving…" : "✓ Mark Paid"}
+                    </Text>
                   </Pressable>
-                  {canMarkManually && (
-                    <Pressable
-                      style={[styles.txActionBtn, { backgroundColor: t.greenSoft, borderColor: t.greenBorder, opacity: markPaidSavingIds.has(debt.id) ? 0.6 : 1 }]}
-                      onPress={() => handleMarkPaidManually(debt.id)}
-                      disabled={markPaidSavingIds.has(debt.id)}
-                    >
-                      <Text style={[styles.txActionText, { color: t.green }]}>
-                        {markPaidSavingIds.has(debt.id) ? "Saving…" : "✓ Mark Paid"}
-                      </Text>
-                    </Pressable>
-                  )}
                 </View>
               )}
               {canUndoPaid && (
-                <View style={[styles.txActionRow, { marginTop: 8 }]}>
+                <View style={styles.txMarkPaidRow}>
                   <Pressable
-                    style={[styles.txActionBtn, { backgroundColor: t.card, borderColor: t.border, opacity: undoPaidSavingIds.has(debt.id) ? 0.6 : 1 }]}
+                    style={[styles.txMarkPaidPill, { backgroundColor: t.card, borderColor: t.border, opacity: undoPaidSavingIds.has(debt.id) ? 0.6 : 1 }]}
                     onPress={() => handleUndoPaid(debt.id)}
                     disabled={undoPaidSavingIds.has(debt.id)}
                   >
-                    <Text style={[styles.txActionText, { color: t.textSub }]}>
+                    <Text style={[styles.txMarkPaidText, { color: t.textSub }]}>
                       {undoPaidSavingIds.has(debt.id) ? "Undoing…" : "↩ Undo Paid"}
                     </Text>
                   </Pressable>
@@ -806,11 +817,19 @@ const styles = StyleSheet.create({
   txDate: { fontSize: 12 },
   statusBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 },
   statusText: { fontSize: 11, fontWeight: "600", color: "#FFFFFF" },
-  dlLabel: { fontSize: 11, marginTop: 4, fontWeight: "500" },
+  txDueRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
+  txDueIcon: { fontSize: 10 },
+  txDueText: { fontSize: 11, fontWeight: "500" },
   txRight: { alignItems: "flex-end" },
   txAmount: { fontSize: 17, fontWeight: "700" },
   txOrig: { fontSize: 11, marginTop: 1 },
   txDir: { fontSize: 12, marginTop: 2 },
+  txPayPill: { borderRadius: 20, overflow: "hidden", marginTop: 8 },
+  txPayPillGrad: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  txPayPillText: { color: "#fff", fontSize: 12, fontWeight: "700" },
+  txMarkPaidRow: { flexDirection: "row", justifyContent: "flex-end", marginTop: 8 },
+  txMarkPaidPill: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 6 },
+  txMarkPaidText: { fontSize: 12, fontWeight: "700" },
   txActionRow: { flexDirection: "row", gap: 8, marginTop: 12 },
   txActionBtn: { flex: 1, borderRadius: 10, borderWidth: 1, paddingVertical: 8, alignItems: "center" },
   txActionText: { fontSize: 13, fontWeight: "700" },

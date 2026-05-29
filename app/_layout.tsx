@@ -76,12 +76,12 @@ function AppShell() {
         <Stack.Screen name="auth" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
         <Stack.Screen name="add-debt" options={safeBackOptions('Add New Debt')} />
-        <Stack.Screen name="add-individual" options={safeBackOptions('Add Individual')} />
+        <Stack.Screen name="add-individual" options={safeBackOptions('Add Friend')} />
         <Stack.Screen name="create-group" options={safeBackOptions('Create Group')} />
         <Stack.Screen name="group/[id]" options={{ title: '' }} />
         <Stack.Screen name="individual/[id]" options={{ title: '' }} />
         <Stack.Screen name="add-group-debt" options={safeBackOptions('Add Group Debt')} />
-        <Stack.Screen name="edit-individual" options={safeBackOptions('Edit Individual')} />
+        <Stack.Screen name="edit-individual" options={safeBackOptions('Edit Friend')} />
         <Stack.Screen name="edit-group" options={safeBackOptions('Edit Group')} />
         <Stack.Screen name="settings/profile" options={{ title: 'Profile' }} />
         <Stack.Screen name="settings/payment-apps" options={{ title: 'Payment Apps' }} />

@@ -24,7 +24,7 @@ export default function AccountSettingsScreen() {
   function confirmClear() {
     Alert.alert(
       "Clear All Data",
-      "This will permanently delete all your debts, individuals, and groups. This cannot be undone.",
+      "This will permanently delete all your debts, friends, and groups. This cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         {

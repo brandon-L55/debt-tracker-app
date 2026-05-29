@@ -133,7 +133,7 @@ export default function IndividualsScreen() {
             style={[styles.swipeAction, { backgroundColor: t.redSoft }]}
             onPress={() =>
               Alert.alert(
-                "Delete Individual",
+                "Delete Friend",
                 `Are you sure you want to delete ${item.name}?`,
                 [
                   { text: "Cancel", style: "cancel" },
@@ -219,14 +219,14 @@ export default function IndividualsScreen() {
       <Text style={[styles.title, { color: t.text }]}>Friends</Text>
       <Text style={[styles.subtitle, { color: t.textSub }]}>Manually added people will appear here.</Text>
       <GradientButton
-        label="+ Add Individual"
+        label="+ Add Friend"
         onPress={() => router.push("/add-individual")}
         style={{ marginBottom: 16 }}
       />
       <View style={[styles.searchRow]}>
         <TextInput
           style={[styles.searchInput, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
-          placeholder="Search individuals..."
+          placeholder="Search friends..."
           placeholderTextColor={t.textMuted}
           value={search}
           onChangeText={setSearch}
@@ -296,7 +296,7 @@ export default function IndividualsScreen() {
               <Text style={styles.emptyIcon}>👥</Text>
             </View>
             <Text style={[styles.emptyTitle, { color: t.text }]}>
-              {individuals.length === 0 ? "No individuals yet." : "No results found."}
+              {individuals.length === 0 ? "No friends yet." : "No results found."}
             </Text>
             <Text style={[styles.emptySubtitle, { color: t.textMuted }]}>
               {individuals.length === 0 ? "Add someone you share debts with." : "Try a different search."}

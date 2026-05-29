@@ -86,7 +86,7 @@ function createPaymentRequestId(debtId: string) {
 export default function IndividualDashboardScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { debts, currentUserId, markDebtsPaid, applyPartialPayment, updateDebtStatus, updateDebtDetails, cancelDebt, addPayment } = useDebts();
+  const { debts, currentUserId, markDebtsPaid, applyPartialPayment, updateDebtStatus, updateDebtDetails, cancelDebt, addPayment, markDebtManuallyPaid, undoManualPaid } = useDebts();
   const { individuals } = useContacts();
   const { colors: t } = useTheme();
 
@@ -100,11 +100,15 @@ export default function IndividualDashboardScreen() {
   const [payPartialPercent, setPayPartialPercent] = useState<number | null>(null);
 
   // Per-debt payment modal (payInputAmount avoids collision with derived payAmount below)
-  const [payingDebt, setPayingDebt] = useState<{ id: string; remaining: number; clientRequestId: string } | null>(null);
+  const [payingDebt, setPayingDebt] = useState<{ id: string; remaining: number; clientRequestId: string; deadline: string | null } | null>(null);
   const [payInputAmount, setPayInputAmount] = useState("");
+  const [payPctSelected, setPayPctSelected] = useState<number | null>(null);
+  const [payPctCustom, setPayPctCustom] = useState("");
   const [payLoading, setPayLoading] = useState(false);
   const paymentSubmittingRef = useRef<Map<string, string>>(new Map());
   const [paymentSavingIds, setPaymentSavingIds] = useState<Set<string>>(() => new Set());
+  const [markPaidSavingIds, setMarkPaidSavingIds] = useState<Set<string>>(() => new Set());
+  const [undoPaidSavingIds, setUndoPaidSavingIds] = useState<Set<string>>(() => new Set());
   const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
   const [editAmount, setEditAmount] = useState("");
   const [editReason, setEditReason] = useState("");
@@ -165,18 +169,26 @@ export default function IndividualDashboardScreen() {
     ]);
   }
 
-  function openPayModal(debtId: string, remaining: number) {
+  function openPayModal(debtId: string, remaining: number, deadline: string | null | undefined) {
     if (paymentSubmittingRef.current.has(debtId)) return;
     setPayInputAmount("");
-    setPayingDebt({ id: debtId, remaining, clientRequestId: createPaymentRequestId(debtId) });
+    setPayPctSelected(null);
+    setPayPctCustom("");
+    setPayingDebt({ id: debtId, remaining, clientRequestId: createPaymentRequestId(debtId), deadline: deadline ?? null });
   }
 
-  async function handleMarkPaid(debtId: string, remaining: number) {
-    const clientRequestId = startPaymentSubmit(debtId, createPaymentRequestId(debtId));
+  async function handlePayFull() {
+    if (!payingDebt || payLoading) return;
+    const clientRequestId = startPaymentSubmit(payingDebt.id, payingDebt.clientRequestId);
     if (!clientRequestId) return;
-    try { await addPayment(debtId, Math.round(remaining * 100), clientRequestId); }
-    catch (e: any) { Alert.alert("Error", e?.message ?? "Could not mark as paid."); }
-    finally { finishPaymentSubmit(debtId); }
+    setPayLoading(true);
+    const debtId = payingDebt.id;
+    const remaining = payingDebt.remaining;
+    try {
+      await addPayment(debtId, Math.round(remaining * 100), clientRequestId);
+      setPayingDebt(null);
+    } catch (e: any) { Alert.alert("Error", e?.message ?? "Could not record payment."); }
+    finally { finishPaymentSubmit(debtId); setPayLoading(false); }
   }
 
   async function handleConfirmPayment() {
@@ -195,6 +207,28 @@ export default function IndividualDashboardScreen() {
       setPayingDebt(null);
     } catch (e: any) { Alert.alert("Error", e?.message ?? "Could not record payment."); }
     finally { finishPaymentSubmit(debtId); setPayLoading(false); }
+  }
+
+  async function handleMarkPaidManually(debtId: string) {
+    setMarkPaidSavingIds(prev => new Set(prev).add(debtId));
+    try {
+      await markDebtManuallyPaid(debtId);
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Could not mark debt as paid.");
+    } finally {
+      setMarkPaidSavingIds(prev => { const n = new Set(prev); n.delete(debtId); return n; });
+    }
+  }
+
+  async function handleUndoPaid(debtId: string) {
+    setUndoPaidSavingIds(prev => new Set(prev).add(debtId));
+    try {
+      await undoManualPaid(debtId);
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Could not undo paid status.");
+    } finally {
+      setUndoPaidSavingIds(prev => { const n = new Set(prev); n.delete(debtId); return n; });
+    }
   }
 
   const td = today();
@@ -239,7 +273,7 @@ export default function IndividualDashboardScreen() {
     <>
       <Stack.Screen
         options={{
-          title: person.name,
+          title: person.nickname || person.name,
           headerRight: () => (
             <Pressable onPress={() => router.push(`/edit-individual?id=${resolvedId}` as any)} style={{ paddingHorizontal: 4 }}>
               <Text style={{ color: t.primary, fontSize: 16, fontWeight: "600" }}>Edit</Text>
@@ -251,8 +285,8 @@ export default function IndividualDashboardScreen() {
         <View style={styles.header}>
           <Avatar name={person.name} imageUri={person.imageUri} size={72} />
           <View style={{ flex: 1 }}>
-            <Text style={[styles.personName, { color: t.text }]}>{person.name}</Text>
-            {person.nickname ? <Text style={[styles.nickname, { color: t.textSub }]}>{`"${person.nickname}"`}</Text> : null}
+            <Text style={[styles.personName, { color: t.text }]}>{person.nickname || person.name}</Text>
+            {person.nickname ? <Text style={[styles.nickname, { color: t.textSub }]}>{person.name}</Text> : null}
             {person.phoneOrUsername ? <Text style={[styles.contact, { color: t.textMuted }]}>{person.phoneOrUsername}</Text> : null}
           </View>
         </View>
@@ -305,6 +339,34 @@ export default function IndividualDashboardScreen() {
           ) : null}
         </View>
 
+        {/* Quick-action row */}
+        <View style={styles.actionRow}>
+          <Pressable
+            style={styles.actionBtnPrimary}
+            onPress={() => router.push(`/add-debt?contactId=${resolvedId}` as any)}
+          >
+            <LinearGradient colors={[t.from, t.to] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionBtnGrad}>
+              <Text style={styles.actionBtnPrimText}>+ Add Debt</Text>
+            </LinearGradient>
+          </Pressable>
+          <Pressable
+            style={[styles.actionBtnSecondary, { borderColor: t.border }]}
+            onPress={() => {
+              const displayName = person.nickname || person.name;
+              if (owedToMe <= 0) {
+                Alert.alert("Nothing to nudge", `${displayName} doesn't owe you anything right now.`);
+                return;
+              }
+              Alert.alert(
+                "Nudge sent!",
+                `Reminder sent to ${displayName}: "You owe $${owedToMe.toFixed(2)}. Please pay when you get a chance!"`,
+              );
+            }}
+          >
+            <Text style={[styles.actionBtnSecText, { color: t.text }]}>Nudge</Text>
+          </Pressable>
+        </View>
+
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: t.text }]}>Transactions</Text>
           {personDebts.length > 0 && (
@@ -331,6 +393,9 @@ export default function IndividualDashboardScreen() {
           const showActions = debt.status === "pending" && !!currentUserId && debt.creatorId !== currentUserId;
           const showCreatorActions = debt.status === "pending" && !!currentUserId && debt.creatorId === currentUserId;
           const canMakePayment = debt.direction === "me" && (debt.status === "accepted" || debt.status === "partial");
+          const isLinked = !!debt.linkedUserId;
+          const canMarkManually = canMakePayment && !isLinked;
+          const canUndoPaid = debt.direction === "me" && !!debt.manuallyPaid && debt.status === "paid";
           return (
             <View key={debt.id} style={[styles.txRow, { backgroundColor: t.card, borderColor: showActions || showCreatorActions ? t.primaryBorder : t.border }]}>
               <View style={styles.txRowContent}>
@@ -379,17 +444,34 @@ export default function IndividualDashboardScreen() {
                 <View style={styles.txActionRow}>
                   <Pressable
                     style={[styles.txActionBtn, { backgroundColor: t.primarySoft, borderColor: t.primaryBorder, opacity: paymentSavingIds.has(debt.id) ? 0.6 : 1 }]}
-                    onPress={() => openPayModal(debt.id, debt.remainingAmount)}
+                    onPress={() => openPayModal(debt.id, debt.remainingAmount, debt.deadline)}
                     disabled={paymentSavingIds.has(debt.id)}
                   >
-                    <Text style={[styles.txActionText, { color: t.primary }]}>💳 Add Payment</Text>
+                    <Text style={[styles.txActionText, { color: t.primary }]}>💳 Pay Debt</Text>
                   </Pressable>
+                  {canMarkManually && (
+                    <Pressable
+                      style={[styles.txActionBtn, { backgroundColor: t.greenSoft, borderColor: t.greenBorder, opacity: markPaidSavingIds.has(debt.id) ? 0.6 : 1 }]}
+                      onPress={() => handleMarkPaidManually(debt.id)}
+                      disabled={markPaidSavingIds.has(debt.id)}
+                    >
+                      <Text style={[styles.txActionText, { color: t.green }]}>
+                        {markPaidSavingIds.has(debt.id) ? "Saving…" : "✓ Mark Paid"}
+                      </Text>
+                    </Pressable>
+                  )}
+                </View>
+              )}
+              {canUndoPaid && (
+                <View style={[styles.txActionRow, { marginTop: 8 }]}>
                   <Pressable
-                    style={[styles.txActionBtn, { backgroundColor: t.greenSoft, borderColor: t.greenBorder, opacity: paymentSavingIds.has(debt.id) ? 0.6 : 1 }]}
-                    onPress={() => handleMarkPaid(debt.id, debt.remainingAmount)}
-                    disabled={paymentSavingIds.has(debt.id)}
+                    style={[styles.txActionBtn, { backgroundColor: t.card, borderColor: t.border, opacity: undoPaidSavingIds.has(debt.id) ? 0.6 : 1 }]}
+                    onPress={() => handleUndoPaid(debt.id)}
+                    disabled={undoPaidSavingIds.has(debt.id)}
                   >
-                    <Text style={[styles.txActionText, { color: t.green }]}>✓ Mark Paid</Text>
+                    <Text style={[styles.txActionText, { color: t.textSub }]}>
+                      {undoPaidSavingIds.has(debt.id) ? "Undoing…" : "↩ Undo Paid"}
+                    </Text>
                   </Pressable>
                 </View>
               )}
@@ -545,28 +627,125 @@ export default function IndividualDashboardScreen() {
         </Pressable>
       </Modal>
 
-      {/* Add Payment modal */}
-      <Modal visible={payingDebt !== null} transparent animationType="fade" onRequestClose={() => { if (!payLoading) setPayingDebt(null); }}>
+      {/* Pay Debt modal */}
+      <Modal visible={payingDebt !== null} transparent animationType="slide" onRequestClose={() => { if (!payLoading) setPayingDebt(null); }}>
         <Pressable style={styles.overlay} onPress={() => { if (!payLoading) setPayingDebt(null); }}>
           <Pressable style={[styles.addPayModal, { backgroundColor: t.elevatedCard, borderColor: t.border }]} onPress={e => e.stopPropagation()}>
-            <Text style={[styles.addPayTitle, { color: t.text }]}>Add Payment</Text>
-            {payingDebt && <Text style={[styles.addPayHint, { color: t.textSub }]}>Remaining: ${payingDebt.remaining.toFixed(2)}</Text>}
+            <Text style={[styles.addPayTitle, { color: t.text }]}>Pay Debt</Text>
+
+            {payingDebt && (() => {
+              const dl = dlInfo(payingDebt.deadline, td);
+              return (
+                <>
+                  <Text style={[styles.addPayRemaining, { color: t.textSub }]}>
+                    Remaining: <Text style={{ color: t.text, fontWeight: "700" }}>${payingDebt.remaining.toFixed(2)}</Text>
+                  </Text>
+                  {dl && (
+                    <Text style={[styles.addPayDue, { color: dl.overdue ? t.red : t.textSub }]}>
+                      {dl.label}{dl.overdue ? " · Overdue" : ""}
+                    </Text>
+                  )}
+                </>
+              );
+            })()}
+
+            {/* Pay in Full */}
+            <Pressable
+              style={[styles.payFullBtn, { opacity: payLoading ? 0.6 : 1 }]}
+              disabled={payLoading}
+              onPress={handlePayFull}
+            >
+              <LinearGradient colors={[t.from, t.to] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.payFullGrad}>
+                <Text style={styles.payFullText}>✓ Pay in Full — ${payingDebt?.remaining.toFixed(2) ?? "0.00"}</Text>
+              </LinearGradient>
+            </Pressable>
+
+            {/* Divider */}
+            <View style={styles.addPayDivider}>
+              <View style={[styles.addPayDividerLine, { backgroundColor: t.border }]} />
+              <Text style={[styles.addPayDividerText, { color: t.textMuted }]}>or pay partial</Text>
+              <View style={[styles.addPayDividerLine, { backgroundColor: t.border }]} />
+            </View>
+
+            {/* Percentage presets */}
+            <View style={styles.pctRow}>
+              {[25, 50, 75, 100].map(pct => {
+                const sel = payPctSelected === pct;
+                return (
+                  <Pressable
+                    key={pct}
+                    style={[styles.pctBtn, !sel && { borderWidth: 1, borderColor: t.border, backgroundColor: t.bg }]}
+                    onPress={() => {
+                      const amt = payingDebt ? parseFloat((payingDebt.remaining * pct / 100).toFixed(2)) : 0;
+                      setPayPctSelected(pct);
+                      setPayPctCustom("");
+                      setPayInputAmount(amt > 0 ? amt.toFixed(2) : "");
+                    }}
+                    disabled={payLoading}
+                  >
+                    {sel ? (
+                      <LinearGradient colors={[t.from, t.to] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.pctBtnGrad}>
+                        <Text style={styles.pctBtnActiveText}>{pct}%</Text>
+                      </LinearGradient>
+                    ) : (
+                      <Text style={[styles.pctBtnText, { color: t.text }]}>{pct}%</Text>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* Custom percentage input */}
+            <View style={[styles.addPayPctWrap, { borderColor: t.border, backgroundColor: t.input }]}>
+              <TextInput
+                style={[styles.addPayPctInput, { color: t.text }]}
+                placeholder="Custom %"
+                placeholderTextColor={t.textMuted}
+                keyboardType="decimal-pad"
+                value={payPctCustom}
+                onChangeText={text => {
+                  setPayPctCustom(text);
+                  setPayPctSelected(null);
+                  const pct = parseFloat(text);
+                  if (payingDebt && !isNaN(pct) && pct > 0 && pct <= 100) {
+                    const amt = parseFloat((payingDebt.remaining * pct / 100).toFixed(2));
+                    setPayInputAmount(amt > 0 ? amt.toFixed(2) : "");
+                  } else {
+                    setPayInputAmount("");
+                  }
+                }}
+                editable={!payLoading}
+              />
+              <Text style={[styles.addPayPctSuffix, { color: t.textSub }]}>%</Text>
+              {payPctCustom !== "" && payInputAmount !== "" && (
+                <Text style={[styles.addPayPctCalc, { color: t.textMuted }]}>= ${payInputAmount}</Text>
+              )}
+            </View>
+
+            {/* Dollar amount — auto-filled by % or typed directly */}
             <TextInput
               style={[styles.addPayInput, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
-              placeholder="Amount (e.g. 50.00)"
+              placeholder="Or enter amount (e.g. 5.00)"
               placeholderTextColor={t.textMuted}
               keyboardType="decimal-pad"
               value={payInputAmount}
-              onChangeText={setPayInputAmount}
-              autoFocus
+              onChangeText={text => {
+                setPayInputAmount(text);
+                setPayPctSelected(null);
+                setPayPctCustom("");
+              }}
               editable={!payLoading}
             />
             <View style={styles.addPayActions}>
               <Pressable style={[styles.addPayBtn, { backgroundColor: t.card, borderColor: t.border }]} onPress={() => setPayingDebt(null)} disabled={payLoading}>
                 <Text style={[styles.addPayBtnText, { color: t.text }]}>Cancel</Text>
               </Pressable>
-              <Pressable style={[styles.addPayBtn, { backgroundColor: t.primarySoft, borderColor: t.primaryBorder, opacity: payLoading ? 0.6 : 1 }]} onPress={handleConfirmPayment} disabled={payLoading}>
-                <Text style={[styles.addPayBtnText, { color: t.primary }]}>{payLoading ? "Saving…" : "Confirm"}</Text>
+              <Pressable
+                style={[styles.addPayBtn, { backgroundColor: t.primarySoft, borderColor: t.primaryBorder, opacity: (payLoading || !payInputAmount) ? 0.5 : 1 }]}
+                onPress={handleConfirmPayment}
+                disabled={payLoading || !payInputAmount}
+              >
+                <Text style={[styles.addPayBtnText, { color: t.primary }]}>{payLoading ? "Saving…" : "Pay Partial"}</Text>
               </Pressable>
             </View>
           </Pressable>
@@ -601,6 +780,14 @@ const styles = StyleSheet.create({
   payBtnPrimText: { color: "#fff", fontSize: 14, fontWeight: "700" },
   payBtnSecondary: { flex: 1, height: 42, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   payBtnSecText: { fontSize: 14, fontWeight: "600" },
+
+  // Quick-action row (Add Debt / Nudge)
+  actionRow: { flexDirection: "row", gap: 10, marginBottom: 20 },
+  actionBtnPrimary: { flex: 1, borderRadius: 14, overflow: "hidden" },
+  actionBtnGrad: { height: 46, alignItems: "center", justifyContent: "center", borderRadius: 14 },
+  actionBtnPrimText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+  actionBtnSecondary: { flex: 1, height: 46, borderRadius: 14, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  actionBtnSecText: { fontSize: 15, fontWeight: "600" },
 
   // Transactions section
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
@@ -683,10 +870,21 @@ const styles = StyleSheet.create({
   editBtn: { flex: 1, borderRadius: 12, borderWidth: 1, paddingVertical: 12, alignItems: "center" },
   editBtnText: { fontSize: 15, fontWeight: "700" },
 
-  // Add Payment modal (prefixed addPay to avoid collision with NET DEBT card pay* styles)
-  addPayModal: { width: 320, borderRadius: 20, borderWidth: 1, padding: 24, gap: 14 },
+  // Pay Debt modal (prefixed addPay to avoid collision with NET DEBT card pay* styles)
+  addPayModal: { width: "90%", maxWidth: 360, borderRadius: 20, borderWidth: 1, padding: 24, gap: 14 },
   addPayTitle: { fontSize: 18, fontWeight: "700" },
-  addPayHint: { fontSize: 13 },
+  addPayRemaining: { fontSize: 14 },
+  addPayDue: { fontSize: 12, fontWeight: "500", marginTop: -6 },
+  payFullBtn: { borderRadius: 14, overflow: "hidden" },
+  payFullGrad: { height: 48, alignItems: "center", justifyContent: "center", borderRadius: 14 },
+  payFullText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+  addPayDivider: { flexDirection: "row", alignItems: "center", gap: 10 },
+  addPayDividerLine: { flex: 1, height: 1 },
+  addPayDividerText: { fontSize: 12, fontWeight: "500" },
+  addPayPctWrap: { flexDirection: "row", alignItems: "center", borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, gap: 8 },
+  addPayPctInput: { flex: 1, fontSize: 16, fontWeight: "600", minWidth: 60 },
+  addPayPctSuffix: { fontSize: 16, fontWeight: "600" },
+  addPayPctCalc: { fontSize: 13, fontWeight: "500" },
   addPayInput: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16 },
   addPayActions: { flexDirection: "row", gap: 10 },
   addPayBtn: { flex: 1, borderRadius: 12, borderWidth: 1, paddingVertical: 12, alignItems: "center" },

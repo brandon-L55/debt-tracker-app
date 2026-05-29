@@ -1,9 +1,12 @@
 import { GradientButton } from "@/components/GradientButton";
+import { Avatar } from "@/components/Avatar";
 import { useDebts } from "@/context/DebtContext";
+import { useContacts } from "@/context/ContactsContext";
 import { useTheme } from "@/context/ThemeContext";
 import { getPendingInvitesForEmails } from "@/lib/services/contactsService";
-import { useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useRef, useState, useMemo } from "react";
+import type { Individual } from "@/context/DebtContext";
 import {
   Alert,
   Dimensions,
@@ -61,13 +64,21 @@ function isEmail(input: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.trim());
 }
 
+type SelectedPerson = {
+  name: string;        // canonical name: used for debt.person (must match individual.name)
+  displayName: string; // chip label: nickname || name
+  contactId?: string;  // when selected from contacts; skips resolvePersonForDebt
+};
+
 export default function AddDebtScreen() {
   const router = useRouter();
+  const { contactId: prefillContactId } = useLocalSearchParams<{ contactId?: string }>();
   const { addDebt } = useDebts();
+  const { individuals } = useContacts();
   const { colors: t } = useTheme();
 
   const [personInput, setPersonInput] = useState("");
-  const [people, setPeople] = useState<string[]>([]);
+  const [people, setPeople] = useState<SelectedPerson[]>([]);
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
   const [direction, setDirection] = useState<"them" | "me" | null>(null);
@@ -81,6 +92,33 @@ export default function AddDebtScreen() {
   const reasonRef = useRef<View>(null);
   const scrollY = useRef(0);
   const kbHeight = useRef(0);
+  const prefillApplied = useRef(false);
+
+  // Pre-fill the person chip when navigated from an Individual detail page.
+  // Waits for contacts to be loaded; ref prevents double-application if the
+  // individuals array reference changes after the initial fill.
+  useEffect(() => {
+    if (!prefillContactId || prefillApplied.current || individuals.length === 0) return;
+    const ind = individuals.find(i => i.id === prefillContactId);
+    if (!ind) return;
+    prefillApplied.current = true;
+    setPeople([{ name: ind.name, displayName: ind.nickname || ind.name, contactId: ind.id }]);
+  }, [prefillContactId, individuals]);
+
+  const suggestions = useMemo<Individual[]>(() => {
+    const q = personInput.trim().toLowerCase();
+    if (!q) return [];
+    const addedNames = new Set(people.map(p => p.name));
+    return individuals
+      .filter(ind => {
+        if (addedNames.has(ind.name)) return false;
+        const display = (ind.nickname || ind.name).toLowerCase();
+        const sub = ind.name.toLowerCase();
+        const pou = (ind.phoneOrUsername || "").toLowerCase();
+        return display.includes(q) || sub.includes(q) || pou.includes(q);
+      })
+      .slice(0, 5);
+  }, [personInput, individuals, people]);
 
   useEffect(() => {
     const show = Keyboard.addListener("keyboardDidShow", (e) => {
@@ -95,13 +133,23 @@ export default function AddDebtScreen() {
     };
   }, []);
 
-  function handleAddPerson() {
-    const trimmed = personInput.trim();
-    if (!trimmed || people.includes(trimmed)) {
+  function selectSuggestion(ind: Individual) {
+    const displayName = ind.nickname || ind.name;
+    if (people.some(p => p.name === ind.name)) {
       setPersonInput("");
       return;
     }
-    setPeople((prev) => [...prev, trimmed]);
+    setPeople(prev => [...prev, { name: ind.name, displayName, contactId: ind.id }]);
+    setPersonInput("");
+  }
+
+  function handleAddPerson() {
+    const trimmed = personInput.trim();
+    if (!trimmed || people.some(p => p.name === trimmed)) {
+      setPersonInput("");
+      return;
+    }
+    setPeople(prev => [...prev, { name: trimmed, displayName: trimmed }]);
     setPersonInput("");
   }
 
@@ -120,9 +168,10 @@ export default function AddDebtScreen() {
       return;
     }
     const trimmedInput = personInput.trim();
-    const effectivePeople =
-      trimmedInput && !people.includes(trimmedInput)
-        ? [...people, trimmedInput]
+    const alreadyAdded = people.some(p => p.name === trimmedInput);
+    const effectivePeople: SelectedPerson[] =
+      trimmedInput && !alreadyAdded
+        ? [...people, { name: trimmedInput, displayName: trimmedInput }]
         : people;
     if (effectivePeople.length === 0) {
       saveInFlightRef.current = false;
@@ -166,17 +215,20 @@ export default function AddDebtScreen() {
     }
     try {
       for (let i = 0; i < effectivePeople.length; i += 1) {
+        const sp = effectivePeople[i];
         await addDebt({
-          person: effectivePeople[i],
+          person: sp.name,
           amount: parseFloat(perPersonAmount.toFixed(2)),
           direction,
           reason: reason.trim(),
           deadline: deadlineISO,
           clientRequestId: saveRequestIdsRef.current[i],
+          contactId: sp.contactId,
         });
       }
+      const emailPeople = effectivePeople.filter(p => !p.contactId && isEmail(p.name));
       const pendingInvites = await getPendingInvitesForEmails(
-        effectivePeople.filter(isEmail),
+        emailPeople.map(p => p.name),
       );
       if (pendingInvites.length > 0) {
         const message = pendingInvites
@@ -252,6 +304,30 @@ export default function AddDebtScreen() {
             onSubmitEditing={handleAddPerson}
             returnKeyType="done"
           />
+          {suggestions.length > 0 && (
+            <View style={[styles.suggestions, { backgroundColor: t.card, borderColor: t.border }]}>
+              {suggestions.map(ind => {
+                const displayName = ind.nickname || ind.name;
+                return (
+                  <Pressable
+                    key={ind.id}
+                    style={[styles.suggestionRow, { borderBottomColor: t.border }]}
+                    onPress={() => selectSuggestion(ind)}
+                  >
+                    <Avatar name={displayName} imageUri={ind.imageUri} size={32} />
+                    <View style={styles.suggestionText}>
+                      <Text style={[styles.suggestionName, { color: t.text }]}>{displayName}</Text>
+                      {ind.nickname ? (
+                        <Text style={[styles.suggestionSub, { color: t.textMuted }]}>{ind.name}</Text>
+                      ) : ind.phoneOrUsername ? (
+                        <Text style={[styles.suggestionSub, { color: t.textMuted }]}>{ind.phoneOrUsername}</Text>
+                      ) : null}
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
           <Pressable
             style={[
               styles.addPersonBtn,
@@ -267,7 +343,7 @@ export default function AddDebtScreen() {
             <View style={styles.chips}>
               {people.map((p) => (
                 <View
-                  key={p}
+                  key={p.name}
                   style={[
                     styles.chip,
                     {
@@ -277,11 +353,11 @@ export default function AddDebtScreen() {
                   ]}
                 >
                   <Text style={[styles.chipText, { color: t.primary }]}>
-                    {p}
+                    {p.displayName}
                   </Text>
                   <Pressable
                     onPress={() =>
-                      setPeople((prev) => prev.filter((x) => x !== p))
+                      setPeople((prev) => prev.filter((x) => x.name !== p.name))
                     }
                     hitSlop={8}
                   >
@@ -479,7 +555,7 @@ export default function AddDebtScreen() {
           { backgroundColor: t.bg, borderTopColor: t.border },
         ]}
       >
-        <GradientButton label="Save Debt" onPress={handleSave} />
+        <GradientButton label="Save Debt" onPress={handleSave} disabled={isSaving} />
       </View>
       {Platform.OS === "ios" &&
         [
@@ -578,4 +654,21 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
   },
   accessoryDone: { fontSize: 16, fontWeight: "600" },
+  suggestions: {
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 6,
+    overflow: "hidden",
+  },
+  suggestionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 10,
+    borderBottomWidth: 1,
+  },
+  suggestionText: { flex: 1 },
+  suggestionName: { fontSize: 15, fontWeight: "600" },
+  suggestionSub: { fontSize: 13, marginTop: 1 },
 });

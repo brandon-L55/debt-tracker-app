@@ -38,13 +38,132 @@ function rowToIndividual(row: ContactRow): Individual {
     id: row.id,
     name: row.name,
     nickname: row.nickname ?? "",
-    phoneOrUsername: row.username ?? "",
+    phoneOrUsername: row.username ?? row.phone ?? row.email ?? "",
     notes: row.notes ?? "",
     imageUri: row.avatar_url ?? undefined,
     createdAt: row.created_at,
     pinned: row.pinned ?? false,
     silenced: row.silenced ?? false,
   };
+}
+
+// ─── Profile search ──────────────────────────────────────────────────────────
+
+export type ProfileSearchResult = {
+  id: string;
+  display_name: string | null;
+  username: string | null;
+  phone: string | null;
+  email: string | null;
+  avatar_url: string | null;
+};
+
+/**
+ * Search public.profiles for a user by phone, @username, or email.
+ * Returns the first exact match or null.
+ */
+export async function searchProfiles(query: string): Promise<ProfileSearchResult | null> {
+  const { data, error } = await supabase.rpc("search_profiles", { query });
+  if (error) throw new Error(error.message);
+  const rows = (data ?? []) as ProfileSearchResult[];
+  return rows.length > 0 ? rows[0] : null;
+}
+
+// ─── Linked contact creation ─────────────────────────────────────────────────
+
+export type NewLinkedContact = {
+  name: string;
+  nickname?: string;
+  notes?: string;
+  /** null for unlinked/invited contacts */
+  linkedUserId: string | null;
+  username?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  avatarUrl?: string | null;
+  inviteStatus?: "pending" | null;
+  invitedEmail?: string | null;
+};
+
+/** Returned by createContact / createLinkedContact. */
+export type ContactResult = {
+  contact: Individual;
+  /** true when the owner already had a matching contact — nothing was inserted. */
+  existed: boolean;
+};
+
+async function fetchContactById(id: string): Promise<Individual> {
+  const { data, error } = await supabase.from("contacts").select("*").eq("id", id).single();
+  if (error) throw new Error(error.message);
+  return rowToIndividual(data as ContactRow);
+}
+
+/**
+ * Insert a contact with full field support (linked_user_id, phone, email, invite).
+ * Idempotent: if the owner already has a matching contact (by linked_user_id, phone,
+ * email, or username) it returns the existing one with existed = true.
+ */
+export async function createLinkedContact(
+  contact: NewLinkedContact,
+  sortOrder: number,
+): Promise<ContactResult> {
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) throw new Error("Not authenticated");
+
+  // Duplicate guard: linked profile
+  if (contact.linkedUserId) {
+    const { data: dup } = await supabase
+      .from("contacts")
+      .select("id")
+      .eq("owner_id", user.id)
+      .eq("linked_user_id", contact.linkedUserId)
+      .maybeSingle();
+    if (dup) {
+      return { contact: await fetchContactById((dup as { id: string }).id), existed: true };
+    }
+  } else {
+    // Duplicate guard: unlinked — check phone, email, username in priority order
+    const checks: Array<[string, string]> = [];
+    if (contact.phone) checks.push(["phone", contact.phone]);
+    if (contact.email) checks.push(["email", contact.email]);
+    if (contact.username) checks.push(["username", contact.username]);
+    for (const [col, val] of checks) {
+      const { data: dup } = await supabase
+        .from("contacts")
+        .select("id")
+        .eq("owner_id", user.id)
+        .eq(col, val)
+        .maybeSingle();
+      if (dup) {
+        return { contact: await fetchContactById((dup as { id: string }).id), existed: true };
+      }
+    }
+  }
+
+  const { data, error } = await supabase
+    .from("contacts")
+    .insert({
+      owner_id: user.id,
+      name: contact.name,
+      nickname: contact.nickname || null,
+      notes: contact.notes || null,
+      linked_user_id: contact.linkedUserId,
+      username: contact.username || null,
+      phone: contact.phone || null,
+      email: contact.email || null,
+      avatar_url: contact.avatarUrl || null,
+      invite_status: contact.inviteStatus ?? null,
+      invited_email: contact.invitedEmail ?? null,
+      invite_created_at: contact.inviteStatus === "pending" ? new Date().toISOString() : null,
+      sort_order: sortOrder,
+      pinned: false,
+      silenced: false,
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+  return { contact: rowToIndividual(data as ContactRow), existed: false };
 }
 
 /**
@@ -63,14 +182,29 @@ export async function getContacts(): Promise<Individual[]> {
 /**
  * Insert a new contact row.
  * owner_id is resolved from the authenticated session — the caller never sets it.
- * Returns the created Individual (with server-generated id and created_at).
+ * Idempotent: if the owner already has a contact with the same username/phone,
+ * returns the existing one with existed = true.
  */
 export async function createContact(
   individual: Omit<Individual, "id" | "createdAt">,
   sortOrder: number
-): Promise<Individual> {
+): Promise<ContactResult> {
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError || !user) throw new Error("Not authenticated");
+
+  // Duplicate guard by username (phoneOrUsername is stored in the username column).
+  if (individual.phoneOrUsername) {
+    const { data: dup } = await supabase
+      .from("contacts")
+      .select("id")
+      .eq("owner_id", user.id)
+      .eq("username", individual.phoneOrUsername)
+      .maybeSingle();
+    if (dup) {
+      return { contact: await fetchContactById((dup as { id: string }).id), existed: true };
+    }
+  }
+
   const { data, error } = await supabase
     .from("contacts")
     .insert({
@@ -90,7 +224,7 @@ export async function createContact(
     console.error("CREATE CONTACT ERROR:", JSON.stringify(error, null, 2));
     throw new Error(error.message ?? "Supabase insert failed");
   }
-  return rowToIndividual(data as ContactRow);
+  return { contact: rowToIndividual(data as ContactRow), existed: false };
 }
 
 /**
@@ -144,10 +278,11 @@ export async function findOrCreateContact(
     if (data) return rowToIndividual(data as ContactRow);
   }
 
-  return createContact(
+  const { contact } = await createContact(
     { name, nickname: "", phoneOrUsername: stored, notes: "", pinned: false, silenced: false },
     sortOrder,
   );
+  return contact;
 }
 
 /**

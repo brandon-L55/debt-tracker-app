@@ -1,83 +1,126 @@
-import { useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import {
+  Alert, KeyboardAvoidingView, Platform, Pressable,
+  ScrollView, StyleSheet, Text, TextInput, View,
+} from "react-native";
 import { useTheme } from "@/context/ThemeContext";
+import { useProfile } from "@/context/ProfileContext";
+import type { ProfileData } from "@/context/ProfileContext";
 
-type App = { key: string; name: string; color: string; description: string };
+type AppConfig = {
+  key: keyof Pick<ProfileData, "venmo_handle" | "cashapp_handle" | "paypal_handle">;
+  name: string;
+  color: string;
+  prefix: string;
+  placeholder: string;
+};
 
-const APPS: App[] = [
-  { key: "venmo", name: "Venmo", color: "#3D95CE", description: "Send & receive via Venmo" },
-  { key: "cashapp", name: "Cash App", color: "#00D64F", description: "Send & receive via Cash App" },
-  { key: "paypal", name: "PayPal", color: "#003087", description: "Send & receive via PayPal" },
+const APPS: AppConfig[] = [
+  { key: "venmo_handle",   name: "Venmo",    color: "#3D95CE", prefix: "@", placeholder: "your-venmo-username" },
+  { key: "cashapp_handle", name: "Cash App", color: "#00C853", prefix: "$", placeholder: "your-cashtag" },
+  { key: "paypal_handle",  name: "PayPal",   color: "#003087", prefix: "",  placeholder: "you@email.com or @username" },
 ];
+
+type HandleForm = Pick<ProfileData, "venmo_handle" | "cashapp_handle" | "paypal_handle">;
+
+const EMPTY_FORM: HandleForm = { venmo_handle: "", cashapp_handle: "", paypal_handle: "" };
 
 export default function PaymentAppsScreen() {
   const { colors: t } = useTheme();
-  const [connected, setConnected] = useState<Record<string, boolean>>({});
+  const { profile, updateProfile } = useProfile();
+  const [form, setForm] = useState<HandleForm>(EMPTY_FORM);
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  function toggle(key: string) {
-    if (connected[key]) {
-      Alert.alert("Disconnect", `Disconnect ${APPS.find(a => a.key === key)?.name}?`, [
-        { text: "Cancel", style: "cancel" },
-        { text: "Disconnect", style: "destructive", onPress: () => setConnected(p => ({ ...p, [key]: false })) },
-      ]);
+  useEffect(() => {
+    setForm({
+      venmo_handle:   profile.venmo_handle,
+      cashapp_handle: profile.cashapp_handle,
+      paypal_handle:  profile.paypal_handle,
+    });
+  }, [profile.venmo_handle, profile.cashapp_handle, profile.paypal_handle]);
+
+  async function handleSave() {
+    setSaving(true);
+    const err = await updateProfile(form);
+    setSaving(false);
+    if (err) {
+      Alert.alert("Error", err);
     } else {
-      Alert.alert("Coming Soon", "Payment app integrations are coming in a future update.", [{ text: "OK" }]);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
     }
   }
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: t.bg }} contentContainerStyle={styles.content}>
-      <Text style={[styles.hint, { color: t.textSub }]}>
-        Connect payment apps to quickly request or send money. Integrations coming soon.
-      </Text>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: t.bg }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 110 : 20}
+    >
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={[styles.hint, { color: t.textSub }]}>
+          Add your payment handles so friends know where to send money. These sync to your profile.
+        </Text>
 
-      <View style={[styles.section, { backgroundColor: t.card, borderColor: t.border }]}>
-        {APPS.map((app, i) => {
-          const isConnected = !!connected[app.key];
-          return (
-            <View
-              key={app.key}
-              style={[styles.row, { borderBottomColor: t.border }, i === APPS.length - 1 && styles.rowLast]}
-            >
-              <View style={[styles.appIcon, { backgroundColor: app.color + "20" }]}>
+        {APPS.map(app => (
+          <View key={app.key} style={styles.formGroup}>
+            <View style={styles.labelRow}>
+              <View style={[styles.appDot, { backgroundColor: app.color + "22" }]}>
                 <Text style={[styles.appInitial, { color: app.color }]}>{app.name[0]}</Text>
               </View>
-              <View style={styles.appInfo}>
-                <Text style={[styles.appName, { color: t.text }]}>{app.name}</Text>
-                <Text style={[styles.appDesc, { color: t.textSub }]}>{app.description}</Text>
-              </View>
-              <Pressable
-                style={[
-                  styles.toggleBtn,
-                  isConnected
-                    ? { backgroundColor: t.greenSoft, borderColor: t.greenBorder }
-                    : { backgroundColor: t.card, borderColor: t.border },
-                ]}
-                onPress={() => toggle(app.key)}
-              >
-                <Text style={[styles.toggleText, { color: isConnected ? t.green : t.textSub }]}>
-                  {isConnected ? "Connected" : "Connect"}
-                </Text>
-              </Pressable>
+              <Text style={[styles.label, { color: t.text }]}>{app.name}</Text>
             </View>
-          );
-        })}
-      </View>
-    </ScrollView>
+            <View style={[styles.inputRow, { backgroundColor: t.input, borderColor: t.border }]}>
+              {app.prefix ? (
+                <Text style={[styles.prefix, { color: t.textMuted }]}>{app.prefix}</Text>
+              ) : null}
+              <TextInput
+                style={[styles.input, { color: t.text }]}
+                placeholder={app.placeholder}
+                placeholderTextColor={t.textMuted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                value={form[app.key]}
+                onChangeText={v => setForm(f => ({ ...f, [app.key]: v.trim() }))}
+              />
+            </View>
+          </View>
+        ))}
+
+        <Pressable
+          style={[
+            styles.saveBtn,
+            { backgroundColor: saved ? "#16A34A" : t.primary, opacity: saving ? 0.7 : 1 },
+          ]}
+          onPress={handleSave}
+          disabled={saving}
+        >
+          <Text style={styles.saveBtnText}>
+            {saved ? "Saved ✓" : saving ? "Saving…" : "Save Payment Handles"}
+          </Text>
+        </Pressable>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   content: { padding: 24, paddingBottom: 48 },
-  hint: { fontSize: 14, lineHeight: 20, marginBottom: 20 },
-  section: { borderRadius: 16, borderWidth: 1, overflow: "hidden" },
-  row: { flexDirection: "row", alignItems: "center", padding: 16, borderBottomWidth: 1, gap: 12 },
-  rowLast: { borderBottomWidth: 0 },
-  appIcon: { width: 44, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  appInitial: { fontSize: 20, fontWeight: "700" },
-  appInfo: { flex: 1 },
-  appName: { fontSize: 16, fontWeight: "600" },
-  appDesc: { fontSize: 12, marginTop: 2 },
-  toggleBtn: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 7 },
-  toggleText: { fontSize: 13, fontWeight: "600" },
+  hint: { fontSize: 14, lineHeight: 20, marginBottom: 24 },
+  formGroup: { marginBottom: 20 },
+  labelRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
+  appDot: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  appInitial: { fontSize: 14, fontWeight: "700" },
+  label: { fontSize: 15, fontWeight: "700" },
+  inputRow: { flexDirection: "row", alignItems: "center", borderRadius: 14, borderWidth: 1, paddingHorizontal: 16 },
+  prefix: { fontSize: 16, fontWeight: "600", marginRight: 2 },
+  input: { flex: 1, paddingVertical: 16, fontSize: 16 },
+  saveBtn: { padding: 18, borderRadius: 16, alignItems: "center", marginTop: 8 },
+  saveBtnText: { color: "#FFFFFF", fontSize: 17, fontWeight: "700" },
 });

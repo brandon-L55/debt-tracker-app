@@ -11,6 +11,15 @@ type DebtSortOption =
   | "date" | "deadline-soonest" | "deadline-latest"
   | "overdue" | "no-deadline" | "nearest" | "farthest";
 
+type FilterTab = "all" | "i-owe" | "owed-to-me" | "pending";
+
+const FILTER_TABS: { value: FilterTab; label: string }[] = [
+  { value: "all",        label: "All Debts"  },
+  { value: "i-owe",      label: "I Owe"      },
+  { value: "owed-to-me", label: "Owed to Me" },
+  { value: "pending",    label: "Pending"    },
+];
+
 const DEBT_SORT_OPTIONS: { value: DebtSortOption; label: string }[] = [
   { value: "date", label: "Most Recent" },
   { value: "nearest", label: "Nearest Deadline" },
@@ -76,6 +85,7 @@ export default function HomeScreen() {
     catch (e: any) { Alert.alert("Error", e?.message ?? "Could not decline debt."); }
   }
   const [sort, setSort] = useState<DebtSortOption>("date");
+  const [filterTab, setFilterTab] = useState<FilterTab>("all");
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [visibleDebtCount, setVisibleDebtCount] = useState(10);
   const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
@@ -143,6 +153,14 @@ export default function HomeScreen() {
   const totalPaid = debts.reduce((s, d) => s + d.totalPaidAmount, 0);
   const totalReceived = debts.reduce((s, d) => s + d.totalReceivedAmount, 0);
   const displayDebts = useMemo(() => sortDebts(debts, sort, td), [debts, sort, td]);
+  const filteredDebts = useMemo(() => {
+    switch (filterTab) {
+      case "i-owe":      return displayDebts.filter(d => d.direction === "me");
+      case "owed-to-me": return displayDebts.filter(d => d.direction === "them");
+      case "pending":    return displayDebts.filter(d => d.status === "pending");
+      default:           return displayDebts;
+    }
+  }, [displayDebts, filterTab]);
   const activeSortLabel = DEBT_SORT_OPTIONS.find(o => o.value === sort)?.label ?? "";
 
   const statCards = [
@@ -247,13 +265,36 @@ export default function HomeScreen() {
           </View>
           {sort !== "date" && <Text style={[styles.sortHint, { color: t.textSub }]}>Sorted by: {activeSortLabel}</Text>}
 
-          {displayDebts.length === 0 ? (
+          {/* Filter tabs */}
+          <View style={styles.filterRow}>
+            {FILTER_TABS.map(tab => {
+              const active = filterTab === tab.value;
+              return (
+                <Pressable
+                  key={tab.value}
+                  style={[
+                    styles.filterTab,
+                    active
+                      ? { backgroundColor: t.primary, borderColor: t.primary }
+                      : { backgroundColor: t.card, borderColor: t.border },
+                  ]}
+                  onPress={() => { setFilterTab(tab.value); setVisibleDebtCount(10); }}
+                >
+                  <Text style={[styles.filterTabText, { color: active ? "#fff" : t.textSub }]}>
+                    {tab.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {filteredDebts.length === 0 ? (
             <View style={styles.emptyFiltered}>
               <Text style={[styles.emptyFilteredText, { color: t.textMuted }]}>No debts match this filter.</Text>
             </View>
           ) : (
             <>
-              {displayDebts.slice(0, visibleDebtCount).map(debt => {
+              {filteredDebts.slice(0, visibleDebtCount).map(debt => {
                 const dl = dlInfo(debt.deadline, td);
                 const isOwedToMe = debt.direction === "them";
                 const showActions = debt.status === "pending" && !!currentUserId && debt.creatorId !== currentUserId;
@@ -318,13 +359,13 @@ export default function HomeScreen() {
                   </View>
                 );
               })}
-              {visibleDebtCount < displayDebts.length && (
+              {visibleDebtCount < filteredDebts.length && (
                 <Pressable
                   style={[styles.loadMoreBtn, { backgroundColor: t.card, borderColor: t.border }]}
-                  onPress={() => setVisibleDebtCount(c => Math.min(c + 10, displayDebts.length))}
+                  onPress={() => setVisibleDebtCount(c => Math.min(c + 10, filteredDebts.length))}
                 >
                   <Text style={[styles.loadMoreText, { color: t.primary }]}>
-                    Load More ({displayDebts.length - visibleDebtCount} remaining)
+                    Load More ({filteredDebts.length - visibleDebtCount} remaining)
                   </Text>
                 </Pressable>
               )}
@@ -469,4 +510,7 @@ const styles = StyleSheet.create({
   editActions: { flexDirection: "row", gap: 10 },
   editBtn: { flex: 1, borderRadius: 12, borderWidth: 1, paddingVertical: 12, alignItems: "center" },
   editBtnText: { fontSize: 15, fontWeight: "700" },
+  filterRow: { flexDirection: "row", gap: 8, marginBottom: 14, flexWrap: "wrap" },
+  filterTab: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 7 },
+  filterTabText: { fontSize: 13, fontWeight: "600" },
 });

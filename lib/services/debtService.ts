@@ -21,6 +21,9 @@ type DebtRow = {
   created_at: string;
   payer_contact: { id: string; name: string } | null;
   borrower_contact: { id: string; name: string } | null;
+  manually_paid: boolean | null;
+  pre_paid_status: string | null;
+  pre_paid_remaining_cents: number | null;
 };
 
 // Internal type used while building the return value — _otherUserId is
@@ -77,6 +80,10 @@ function rowToDebt(row: DebtRow, currentUserId: string): DebtWithMeta {
     createdAt: row.created_at,
     groupId: row.group_id ?? undefined,
     deadline: row.due_date ?? null,
+    manuallyPaid: row.manually_paid ?? false,
+    prePaidStatus: (row.pre_paid_status as Debt["status"]) ?? undefined,
+    prePaidRemainingAmount:
+      row.pre_paid_remaining_cents != null ? row.pre_paid_remaining_cents / 100 : undefined,
     // Tag debts whose person name is missing so getDebts can batch-fill them.
     _otherUserId:
       !contactRecord && !!otherUserId && otherUserId !== currentUserId
@@ -127,7 +134,8 @@ function stripMeta(debts: DebtWithMeta[]): Debt[] {
  * Resolve a typed person string to { contactId, linkedUserId }.
  * - Email  → find/create contact by email; link to real profile if one exists.
  * - Phone / @username → find/create contact by phone/username (no profile link).
- * - Plain name → create new contact (no dedup by name per spec).
+ * - Plain name → look up existing contacts by name first (prefer linked over
+ *   unlinked); only creates a new contact if none are found.
  */
 async function resolvePersonForDebt(personInput: string): Promise<{
   contactId: string;
@@ -146,22 +154,29 @@ async function resolvePersonForDebt(personInput: string): Promise<{
     isPhoneNumber(trimmed) || trimmed.startsWith("@");
   const phoneOrUsername = isPhoneOrUsername ? trimmed : "";
 
-  // For plain-name input, check if the existing contact stores a valid email
-  // in their username field and route through the email path for profile linking.
-  // This covers the case where the user added "brij" by name but previously saved
-  // their email (e.g. chhabrabrij@gmail.com) in the username/phone field.
+  // For plain-name input, look up existing contacts by name.
+  // Linked contacts (linked_user_id != null) take priority over unlinked ones.
+  // If a match is found, use it directly — never create a duplicate.
   if (!phoneOrUsername) {
     type ContactLookup = { id: string; username: string | null; linked_user_id: string | null };
     const { data: byName } = await supabase
       .from("contacts")
       .select("id, username, linked_user_id")
-      .ilike("name", trimmed)
-      .maybeSingle();
-    const found = byName as ContactLookup | null;
-    const storedEmail = found?.username?.trim().toLowerCase() ?? "";
-    if (isEmail(storedEmail)) {
-      const contact = await findOrCreateContactByEmail(storedEmail, trimmed);
-      return { contactId: contact.id, linkedUserId: contact.linkedUserId ?? null };
+      .ilike("name", trimmed);
+
+    const matches = ((byName ?? []) as ContactLookup[]);
+    // Prefer linked contact; fall back to first match
+    const found = matches.find(c => c.linked_user_id) ?? matches[0] ?? null;
+
+    if (found) {
+      const storedEmail = found.username?.trim().toLowerCase() ?? "";
+      if (isEmail(storedEmail)) {
+        // Route through email path so invite/claim status stays current.
+        const contact = await findOrCreateContactByEmail(storedEmail, trimmed);
+        return { contactId: contact.id, linkedUserId: contact.linkedUserId ?? null };
+      }
+      // Use the existing contact as-is — no new row created.
+      return { contactId: found.id, linkedUserId: found.linked_user_id ?? null };
     }
   }
 
@@ -507,4 +522,81 @@ export async function createPayment(
   if ((error as { code?: string } | null)?.code === "23505") return "duplicate";
   if (error) throw new Error(error.message);
   return "inserted";
+}
+
+/**
+ * Mark a debt as paid without going through payment records (offline payment).
+ * Stores the pre-paid state so the action can be undone.
+ * Requires the `manually_paid`, `pre_paid_status`, and `pre_paid_remaining_cents`
+ * columns to exist on the debts table (see migration below).
+ *
+ * Migration (run once in Supabase SQL editor):
+ *   ALTER TABLE debts
+ *     ADD COLUMN IF NOT EXISTS manually_paid boolean NOT NULL DEFAULT false,
+ *     ADD COLUMN IF NOT EXISTS pre_paid_status text,
+ *     ADD COLUMN IF NOT EXISTS pre_paid_remaining_cents integer;
+ */
+export async function markDebtManuallyPaid(debtId: string): Promise<void> {
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) throw new Error("Not authenticated");
+
+  const { data: row, error: fetchErr } = await supabase
+    .from("debts")
+    .select("amount_cents, paid_cents, status")
+    .eq("id", debtId)
+    .single();
+  if (fetchErr) throw new Error(fetchErr.message);
+
+  const r = row as { amount_cents: number; paid_cents: number; status: string };
+  const prePaidRemainingCents = r.amount_cents - (r.paid_cents ?? 0);
+
+  const { error } = await supabase
+    .from("debts")
+    .update({
+      status: "paid",
+      paid_cents: r.amount_cents,
+      manually_paid: true,
+      pre_paid_status: r.status,
+      pre_paid_remaining_cents: prePaidRemainingCents,
+    })
+    .eq("id", debtId);
+
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Undo a manual "mark paid" — restores the debt to its pre-paid state.
+ */
+export async function undoManualPaid(debtId: string): Promise<void> {
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) throw new Error("Not authenticated");
+
+  const { data: row, error: fetchErr } = await supabase
+    .from("debts")
+    .select("amount_cents, pre_paid_status, pre_paid_remaining_cents")
+    .eq("id", debtId)
+    .single();
+  if (fetchErr) throw new Error(fetchErr.message);
+
+  const r = row as {
+    amount_cents: number;
+    pre_paid_status: string | null;
+    pre_paid_remaining_cents: number | null;
+  };
+  if (!r.pre_paid_status) throw new Error("No undo data available for this debt.");
+
+  const restoredPaidCents = r.amount_cents - (r.pre_paid_remaining_cents ?? 0);
+
+  const { error } = await supabase
+    .from("debts")
+    .update({
+      status: r.pre_paid_status,
+      paid_cents: restoredPaidCents,
+      manually_paid: false,
+      pre_paid_status: null,
+      pre_paid_remaining_cents: null,
+    })
+    .eq("id", debtId);
+
+  if (error) throw new Error(error.message);
 }

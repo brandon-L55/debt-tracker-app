@@ -4,12 +4,21 @@ import { useAuth } from "./AuthContext";
 import { useDebts } from "./DebtContext";
 import type { Individual } from "./DebtContext";
 import * as contactsService from "@/lib/services/contactsService";
+import type { NewLinkedContact } from "@/lib/services/contactsService";
 import { supabase } from "@/lib/supabase";
 
 type ContactsContextType = {
   individuals: Individual[];
-  /** Async: awaiting ensures the contact is persisted before navigation. */
-  addIndividual: (individual: Omit<Individual, "id" | "createdAt">) => Promise<void>;
+  /**
+   * Async: awaiting ensures the contact is persisted before navigation.
+   * Returns true if a matching contact already existed (nothing was inserted).
+   */
+  addIndividual: (individual: Omit<Individual, "id" | "createdAt">) => Promise<boolean>;
+  /**
+   * Async: creates a contact with full field support (linked_user_id, phone, email, invite).
+   * Returns true if a matching contact already existed (nothing was inserted).
+   */
+  addLinkedIndividual: (data: NewLinkedContact) => Promise<boolean>;
   /** Optimistic: local state updates immediately; Supabase syncs in background. */
   updateIndividual: (id: string, updates: Partial<Omit<Individual, "id" | "createdAt">>) => void;
   /** Optimistic: local state updates immediately; Supabase syncs in background. */
@@ -97,12 +106,26 @@ export function ContactsProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function addIndividual(individual: Omit<Individual, "id" | "createdAt">) {
+  async function addIndividual(individual: Omit<Individual, "id" | "createdAt">): Promise<boolean> {
     if (!session) throw new Error("Not authenticated");
     const sortOrder = individuals.length;
-    const created = await contactsService.createContact(individual, sortOrder);
-    setIndividuals(prev => [...prev, created]);
-    setIndividualOrderState(prev => [...prev, created.id]);
+    const { contact, existed } = await contactsService.createContact(individual, sortOrder);
+    if (!existed) {
+      setIndividuals(prev => [...prev, contact]);
+      setIndividualOrderState(prev => [...prev, contact.id]);
+    }
+    return existed;
+  }
+
+  async function addLinkedIndividual(data: NewLinkedContact): Promise<boolean> {
+    if (!session) throw new Error("Not authenticated");
+    const sortOrder = individuals.length;
+    const { contact, existed } = await contactsService.createLinkedContact(data, sortOrder);
+    if (!existed) {
+      setIndividuals(prev => [...prev, contact]);
+      setIndividualOrderState(prev => [...prev, contact.id]);
+    }
+    return existed;
   }
 
   function updateIndividual(id: string, updates: Partial<Omit<Individual, "id" | "createdAt">>) {
@@ -151,6 +174,7 @@ export function ContactsProvider({ children }: { children: ReactNode }) {
     <ContactsContext.Provider value={{
       individuals,
       addIndividual,
+      addLinkedIndividual,
       updateIndividual,
       deleteIndividual,
       individualOrder,

@@ -10,6 +10,7 @@ import { ContactsProvider } from '@/context/ContactsContext';
 import { GroupsProvider } from '@/context/GroupsContext';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
+import { ProfileProvider } from '@/context/ProfileContext';
 
 
 export const unstable_settings = {
@@ -21,6 +22,7 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
         <AuthProvider>
+          <ProfileProvider>
           <DebtProvider>
             {/* ContactsProvider and GroupsProvider are inside DebtProvider so they can call renameDebtPerson */}
             <ContactsProvider>
@@ -29,6 +31,7 @@ export default function RootLayout() {
               </GroupsProvider>
             </ContactsProvider>
           </DebtProvider>
+          </ProfileProvider>
         </AuthProvider>
       </ThemeProvider>
     </GestureHandlerRootView>

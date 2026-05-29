@@ -58,7 +58,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="individuals"
         options={{
-          title: 'Individuals',
+          title: 'Contacts',
           tabBarIcon: ({ color, focused }) => <TabIcon name="person.2.fill" color={color} focused={focused} />,
         }}
       />

@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
-import { getDebts, createDebt, updateDebtStatus as serviceUpdateDebtStatus, updateDebtDetails as serviceUpdateDebtDetails, cancelDebt as serviceCancelDebt, createPayment } from "@/lib/services/debtService";
+import { getDebts, createDebt, updateDebtStatus as serviceUpdateDebtStatus, updateDebtDetails as serviceUpdateDebtDetails, cancelDebt as serviceCancelDebt, createPayment, markDebtManuallyPaid as serviceMarkManualPaid, undoManualPaid as serviceUndoManualPaid } from "@/lib/services/debtService";
 import type { CreateDebtInput, UpdateDebtDetailsInput } from "@/lib/services/debtService";
 import { showDebtNotification } from "@/lib/services/notificationService";
 
@@ -27,6 +27,12 @@ export type Debt = {
   createdAt: string;
   groupId?: string;
   deadline?: string | null;
+  /** True when this debt was manually marked paid without a payment record. */
+  manuallyPaid?: boolean;
+  /** Status before manual paid — used to restore on undo. */
+  prePaidStatus?: Debt["status"];
+  /** Remaining balance before manual paid — used to restore on undo. */
+  prePaidRemainingAmount?: number;
 };
 
 // Group and GroupMember types remain here so all screens can import them
@@ -82,6 +88,10 @@ type DebtContextType = {
   markDebtsPaid: (ids: string[]) => void;
   /** Applies a partial payment amount against a person's active owed debts, oldest-first. Fully paid debts are marked paid; the last debt may be partially reduced. */
   applyPartialPayment: (personName: string, amount: number) => void;
+  /** Marks a non-linked debt as paid without a payment record (outside-app payment). Stores pre-paid state for undo. */
+  markDebtManuallyPaid: (debtId: string) => Promise<void>;
+  /** Reverts a manual-paid debt back to its previous state. */
+  undoManualPaid: (debtId: string) => Promise<void>;
   reset: () => void;
   isLoading: boolean;
 };
@@ -462,6 +472,72 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function markDebtManuallyPaid(debtId: string) {
+    const debt = debtsRef.current.find(d => d.id === debtId);
+    if (!debt) throw new Error("Debt not found");
+
+    const prePaidStatus = debt.status;
+    const prePaidRemainingAmount = debt.remainingAmount;
+
+    setDebts(prev => prev.map(d => d.id === debtId ? {
+      ...d,
+      status: "paid" as const,
+      remainingAmount: 0,
+      totalPaidAmount: d.amount,
+      manuallyPaid: true,
+      prePaidStatus,
+      prePaidRemainingAmount,
+    } : d));
+
+    try {
+      await serviceMarkManualPaid(debtId);
+    } catch (e) {
+      setDebts(prev => prev.map(d => d.id === debtId ? {
+        ...d,
+        status: prePaidStatus,
+        remainingAmount: prePaidRemainingAmount,
+        totalPaidAmount: d.amount - prePaidRemainingAmount,
+        manuallyPaid: false,
+        prePaidStatus: undefined,
+        prePaidRemainingAmount: undefined,
+      } : d));
+      throw e;
+    }
+  }
+
+  async function undoManualPaid(debtId: string) {
+    const debt = debtsRef.current.find(d => d.id === debtId);
+    if (!debt) throw new Error("Debt not found");
+
+    const restoredStatus = debt.prePaidStatus ?? "accepted";
+    const restoredRemaining = debt.prePaidRemainingAmount ?? debt.amount;
+
+    setDebts(prev => prev.map(d => d.id === debtId ? {
+      ...d,
+      status: restoredStatus as Debt["status"],
+      remainingAmount: restoredRemaining,
+      totalPaidAmount: d.amount - restoredRemaining,
+      manuallyPaid: false,
+      prePaidStatus: undefined,
+      prePaidRemainingAmount: undefined,
+    } : d));
+
+    try {
+      await serviceUndoManualPaid(debtId);
+    } catch (e) {
+      setDebts(prev => prev.map(d => d.id === debtId ? {
+        ...d,
+        status: "paid" as const,
+        remainingAmount: 0,
+        totalPaidAmount: d.amount,
+        manuallyPaid: true,
+        prePaidStatus: restoredStatus as Debt["status"],
+        prePaidRemainingAmount: restoredRemaining,
+      } : d));
+      throw e;
+    }
+  }
+
   function reset() {
     setDebts([]);
   }
@@ -472,6 +548,8 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       renameDebtPerson,
       markDebtsPaid,
       applyPartialPayment,
+      markDebtManuallyPaid,
+      undoManualPaid,
       reset,
       isLoading,
     }}>

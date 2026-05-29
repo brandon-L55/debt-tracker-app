@@ -170,7 +170,7 @@ export default function SettingsScreen() {
       ) : null}
 
       <Text style={[styles.footer, { color: t.textMuted }]}>
-        All data is stored locally on this device.
+        Your debts, contacts, and profile sync securely to the cloud.
       </Text>
     </ScrollView>
   );

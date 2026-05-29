@@ -1,33 +1,33 @@
 import { useEffect, useState } from "react";
 import {
-  Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  Alert, Image, KeyboardAvoidingView, Platform, Pressable,
+  ScrollView, StyleSheet, Text, TextInput, View,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { useTheme } from "@/context/ThemeContext";
 import { Avatar } from "@/components/Avatar";
-
-const PROFILE_KEY = "@debt_tracker/profile";
-
-type Profile = {
-  name: string;
-  phone: string;
-  email: string;
-  imageUri?: string;
-};
-
-const EMPTY: Profile = { name: "", phone: "", email: "" };
+import { useProfile } from "@/context/ProfileContext";
 
 export default function ProfileSettingsScreen() {
   const { colors: t } = useTheme();
-  const [profile, setProfile] = useState<Profile>(EMPTY);
+  const { profile, updateProfile } = useProfile();
+  const [form, setForm] = useState({
+    display_name: "",
+    phone: "",
+    username: "",
+    avatar_url: null as string | null,
+  });
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    AsyncStorage.getItem(PROFILE_KEY).then(v => {
-      if (v) setProfile(JSON.parse(v));
+    setForm({
+      display_name: profile.display_name,
+      phone: profile.phone,
+      username: profile.username,
+      avatar_url: profile.avatar_url,
     });
-  }, []);
+  }, [profile.display_name, profile.phone, profile.username, profile.avatar_url]);
 
   async function pickImage() {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -37,74 +37,99 @@ export default function ProfileSettingsScreen() {
       quality: 0.7,
     });
     if (!result.canceled && result.assets[0]?.uri) {
-      setProfile(p => ({ ...p, imageUri: result.assets[0].uri }));
+      setForm(f => ({ ...f, avatar_url: result.assets[0].uri }));
     }
   }
 
   async function handleSave() {
-    await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setSaving(true);
+    const err = await updateProfile(form);
+    setSaving(false);
+    if (err) {
+      Alert.alert("Error", err);
+    } else {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    }
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: t.bg }} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 110 : 20}>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"} showsVerticalScrollIndicator={false}>
-      {/* Avatar */}
-      <View style={styles.avatarSection}>
-        {profile.imageUri ? (
-          <Image source={{ uri: profile.imageUri }} style={styles.avatarImg} />
-        ) : (
-          <Avatar name={profile.name || "Me"} size={88} />
-        )}
-        <Pressable style={[styles.changePhotoBtn, { borderColor: t.border, backgroundColor: t.card }]} onPress={pickImage}>
-          <Text style={[styles.changePhotoText, { color: t.primary }]}>Change Photo</Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={[styles.label, { color: t.text }]}>Display Name</Text>
-        <TextInput
-          style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
-          placeholder="Your name"
-          placeholderTextColor={t.textMuted}
-          value={profile.name}
-          onChangeText={v => setProfile(p => ({ ...p, name: v }))}
-        />
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={[styles.label, { color: t.text }]}>Phone Number</Text>
-        <TextInput
-          style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
-          placeholder="+1 (555) 000-0000"
-          placeholderTextColor={t.textMuted}
-          keyboardType="phone-pad"
-          value={profile.phone}
-          onChangeText={v => setProfile(p => ({ ...p, phone: v }))}
-        />
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={[styles.label, { color: t.text }]}>Backup Email <Text style={{ color: t.textMuted, fontWeight: "400" }}>(optional)</Text></Text>
-        <TextInput
-          style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
-          placeholder="you@example.com"
-          placeholderTextColor={t.textMuted}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          value={profile.email}
-          onChangeText={v => setProfile(p => ({ ...p, email: v }))}
-        />
-      </View>
-
-      <Pressable
-        style={[styles.saveBtn, { backgroundColor: saved ? "#16A34A" : t.primary }]}
-        onPress={handleSave}
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: t.bg }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 110 : 20}
+    >
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+        showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.saveBtnText}>{saved ? "Saved ✓" : "Save Profile"}</Text>
-      </Pressable>
-    </ScrollView>
+        {/* Avatar */}
+        <View style={styles.avatarSection}>
+          {form.avatar_url ? (
+            <Image source={{ uri: form.avatar_url }} style={styles.avatarImg} />
+          ) : (
+            <Avatar name={form.display_name || "Me"} size={88} />
+          )}
+          <Pressable
+            style={[styles.changePhotoBtn, { borderColor: t.border, backgroundColor: t.card }]}
+            onPress={pickImage}
+          >
+            <Text style={[styles.changePhotoText, { color: t.primary }]}>Change Photo</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.formGroup}>
+          <Text style={[styles.label, { color: t.text }]}>Display Name</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
+            placeholder="Your name"
+            placeholderTextColor={t.textMuted}
+            value={form.display_name}
+            onChangeText={v => setForm(f => ({ ...f, display_name: v }))}
+          />
+        </View>
+
+        <View style={styles.formGroup}>
+          <Text style={[styles.label, { color: t.text }]}>Username</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
+            placeholder="@username"
+            placeholderTextColor={t.textMuted}
+            autoCapitalize="none"
+            autoCorrect={false}
+            value={form.username}
+            onChangeText={v => setForm(f => ({ ...f, username: v.replace(/\s/g, "") }))}
+          />
+        </View>
+
+        <View style={styles.formGroup}>
+          <Text style={[styles.label, { color: t.text }]}>Phone Number</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
+            placeholder="+1 (555) 000-0000"
+            placeholderTextColor={t.textMuted}
+            keyboardType="phone-pad"
+            value={form.phone}
+            onChangeText={v => setForm(f => ({ ...f, phone: v }))}
+          />
+        </View>
+
+        <Pressable
+          style={[
+            styles.saveBtn,
+            { backgroundColor: saved ? "#16A34A" : t.primary, opacity: saving ? 0.7 : 1 },
+          ]}
+          onPress={handleSave}
+          disabled={saving}
+        >
+          <Text style={styles.saveBtnText}>
+            {saved ? "Saved ✓" : saving ? "Saving…" : "Save Profile"}
+          </Text>
+        </Pressable>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }

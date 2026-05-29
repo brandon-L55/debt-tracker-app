@@ -115,13 +115,15 @@ export default function AddGroupDebtScreen() {
         <View style={styles.chips}>
           {group.members.map(m => {
             const sel = selected.includes(m.id);
+            const contact = m.contactId ? individuals.find(i => i.id === m.contactId) : null;
+            const displayName = contact?.nickname || contact?.name || m.name;
             return (
               <Pressable
                 key={m.id}
                 style={[styles.chip, { backgroundColor: sel ? t.primarySoft : t.card, borderColor: sel ? t.primary : t.border }]}
                 onPress={() => toggleMember(m.id)}
               >
-                <Text style={[styles.chipText, { color: sel ? t.primary : t.textSub }]}>{m.name}</Text>
+                <Text style={[styles.chipText, { color: sel ? t.primary : t.textSub }]}>{displayName}</Text>
               </Pressable>
             );
           })}

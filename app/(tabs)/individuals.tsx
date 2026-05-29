@@ -193,11 +193,11 @@ export default function IndividualsScreen() {
               <Avatar name={item.name} imageUri={item.imageUri} size={44} />
               <View style={styles.cardText}>
                 <View style={styles.cardNameRow}>
-                  <Text style={[styles.cardName, { color: t.text }]}>{item.name}</Text>
+                  <Text style={[styles.cardName, { color: t.text }]}>{item.nickname || item.name}</Text>
                   {item.pinned ? <Text style={styles.cardBadge}>📌</Text> : null}
                   {item.silenced ? <Text style={styles.cardBadge}>🔇</Text> : null}
                 </View>
-                {item.nickname ? <Text style={[styles.cardNickname, { color: t.textSub }]}>"{item.nickname}"</Text> : null}
+                {item.nickname ? <Text style={[styles.cardNickname, { color: t.textSub }]}>{item.name}</Text> : null}
                 {item.phoneOrUsername ? <Text style={[styles.cardMeta, { color: t.textMuted }]}>{item.phoneOrUsername}</Text> : null}
                 {item.notes ? <Text style={[styles.cardNotes, { color: t.textMuted }]}>{item.notes}</Text> : null}
               </View>
@@ -216,7 +216,7 @@ export default function IndividualsScreen() {
 
   const listHeader = (
     <View>
-      <Text style={[styles.title, { color: t.text }]}>Individuals</Text>
+      <Text style={[styles.title, { color: t.text }]}>Friends</Text>
       <Text style={[styles.subtitle, { color: t.textSub }]}>Manually added people will appear here.</Text>
       <GradientButton
         label="+ Add Individual"

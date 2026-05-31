@@ -44,6 +44,7 @@ function rowToIndividual(row: ContactRow): Individual {
     createdAt: row.created_at,
     pinned: row.pinned ?? false,
     silenced: row.silenced ?? false,
+    linkedUserId: row.linked_user_id ?? undefined,
   };
 }
 

@@ -9,8 +9,11 @@ import { useContacts } from "@/context/ContactsContext";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { Avatar } from "@/components/Avatar";
+import { DoneBar } from "@/components/DoneBar";
 import { GradientButton } from "@/components/GradientButton";
 import { searchProfiles, type ProfileSearchResult } from "@/lib/services/contactsService";
+
+const ACCESSORY_ID = "add-individual";
 
 function normalizeQuery(q: string) {
   return q.trim().toLowerCase().replace(/^@/, "");
@@ -205,6 +208,7 @@ export default function AddIndividualScreen() {
         <ScrollView
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
           showsVerticalScrollIndicator={false}
         >
           <Text style={[styles.title, { color: t.text }]}>Add Someone</Text>
@@ -223,6 +227,7 @@ export default function AddIndividualScreen() {
               autoCorrect={false}
               autoFocus
               returnKeyType="search"
+              inputAccessoryViewID={ACCESSORY_ID}
               onSubmitEditing={handleSearch}
             />
             {query.length > 0 && (
@@ -252,6 +257,7 @@ export default function AddIndividualScreen() {
             <Text style={[styles.manualLink, { color: t.primary }]}>Add manually without searching</Text>
           </Pressable>
         </ScrollView>
+        <DoneBar nativeID={ACCESSORY_ID} />
       </KeyboardAvoidingView>
     );
   }
@@ -269,6 +275,7 @@ export default function AddIndividualScreen() {
         <ScrollView
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
           showsVerticalScrollIndicator={false}
         >
           <Pressable onPress={resetToSearch} style={styles.backWrap}>
@@ -301,6 +308,7 @@ export default function AddIndividualScreen() {
               style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
               placeholder="Name in your contacts"
               placeholderTextColor={t.textMuted}
+              inputAccessoryViewID={ACCESSORY_ID}
               value={name}
               onChangeText={setName}
             />
@@ -315,6 +323,7 @@ export default function AddIndividualScreen() {
               style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
               placeholder="What do you call them?"
               placeholderTextColor={t.textMuted}
+              inputAccessoryViewID={ACCESSORY_ID}
               value={nickname}
               onChangeText={setNickname}
             />
@@ -331,6 +340,7 @@ export default function AddIndividualScreen() {
               placeholderTextColor={t.textMuted}
               multiline
               scrollEnabled={false}
+              inputAccessoryViewID={ACCESSORY_ID}
               value={notes}
               onChangeText={setNotes}
             />
@@ -343,6 +353,7 @@ export default function AddIndividualScreen() {
             style={{ marginTop: 8, marginBottom: 40 }}
           />
         </ScrollView>
+        <DoneBar nativeID={ACCESSORY_ID} />
       </KeyboardAvoidingView>
     );
   }
@@ -359,6 +370,7 @@ export default function AddIndividualScreen() {
         <ScrollView
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
           showsVerticalScrollIndicator={false}
         >
           <Pressable onPress={resetToSearch} style={styles.backWrap}>
@@ -381,6 +393,7 @@ export default function AddIndividualScreen() {
               style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
               placeholder="What do you call this person?"
               placeholderTextColor={t.textMuted}
+              inputAccessoryViewID={ACCESSORY_ID}
               value={name}
               onChangeText={setName}
               autoFocus
@@ -396,6 +409,7 @@ export default function AddIndividualScreen() {
               style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
               placeholder="A private label for this person"
               placeholderTextColor={t.textMuted}
+              inputAccessoryViewID={ACCESSORY_ID}
               value={nickname}
               onChangeText={setNickname}
             />
@@ -412,6 +426,7 @@ export default function AddIndividualScreen() {
               placeholderTextColor={t.textMuted}
               multiline
               scrollEnabled={false}
+              inputAccessoryViewID={ACCESSORY_ID}
               value={notes}
               onChangeText={setNotes}
             />
@@ -424,6 +439,7 @@ export default function AddIndividualScreen() {
             style={{ marginTop: 8, marginBottom: 40 }}
           />
         </ScrollView>
+        <DoneBar nativeID={ACCESSORY_ID} />
       </KeyboardAvoidingView>
     );
   }
@@ -437,6 +453,7 @@ export default function AddIndividualScreen() {
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
         showsVerticalScrollIndicator={false}
       >
         <Pressable onPress={resetToSearch} style={styles.backWrap}>
@@ -481,6 +498,7 @@ export default function AddIndividualScreen() {
             style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
             placeholder="Full name"
             placeholderTextColor={t.textMuted}
+            inputAccessoryViewID={ACCESSORY_ID}
             value={name}
             onChangeText={setName}
           />
@@ -492,6 +510,7 @@ export default function AddIndividualScreen() {
             style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
             placeholder="What do you call them?"
             placeholderTextColor={t.textMuted}
+            inputAccessoryViewID={ACCESSORY_ID}
             value={nickname}
             onChangeText={setNickname}
           />
@@ -503,6 +522,7 @@ export default function AddIndividualScreen() {
             style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
             placeholder="+1 555-000-0000 or @username"
             placeholderTextColor={t.textMuted}
+            inputAccessoryViewID={ACCESSORY_ID}
             value={manualPhone}
             onChangeText={setManualPhone}
             autoCapitalize="none"
@@ -517,6 +537,7 @@ export default function AddIndividualScreen() {
             placeholderTextColor={t.textMuted}
             multiline
             scrollEnabled={false}
+            inputAccessoryViewID={ACCESSORY_ID}
             value={notes}
             onChangeText={setNotes}
           />
@@ -529,6 +550,7 @@ export default function AddIndividualScreen() {
           style={{ marginTop: 10, marginBottom: 40 }}
         />
       </ScrollView>
+      <DoneBar nativeID={ACCESSORY_ID} />
     </KeyboardAvoidingView>
   );
 }

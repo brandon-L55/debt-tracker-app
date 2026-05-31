@@ -16,8 +16,11 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useGroups } from "@/context/GroupsContext";
 import { useTheme } from "@/context/ThemeContext";
 import { Avatar } from "@/components/Avatar";
+import { DoneBar } from "@/components/DoneBar";
 import { GradientButton } from "@/components/GradientButton";
 import type { GroupMember } from "@/context/DebtContext";
+
+const ACCESSORY_ID = "edit-group";
 
 function uid() {
   return Math.random().toString(36).slice(2);
@@ -127,6 +130,7 @@ export default function EditGroupScreen() {
           style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
           placeholder="Group name"
           placeholderTextColor={t.textMuted}
+          inputAccessoryViewID={ACCESSORY_ID}
           value={groupName}
           onChangeText={setGroupName}
         />
@@ -138,6 +142,7 @@ export default function EditGroupScreen() {
           style={[styles.input, styles.textArea, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
           placeholder="What is this group for?"
           placeholderTextColor={t.textMuted}
+          inputAccessoryViewID={ACCESSORY_ID}
           value={description}
           onChangeText={setDescription}
           multiline
@@ -164,6 +169,7 @@ export default function EditGroupScreen() {
             style={[styles.input, styles.memberNameInput, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
             placeholder="Name"
             placeholderTextColor={t.textMuted}
+            inputAccessoryViewID={ACCESSORY_ID}
             value={memberName}
             onChangeText={setMemberName}
           />
@@ -171,6 +177,7 @@ export default function EditGroupScreen() {
             style={[styles.input, styles.memberContactInput, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
             placeholder="Phone or @username"
             placeholderTextColor={t.textMuted}
+            inputAccessoryViewID={ACCESSORY_ID}
             value={memberContact}
             onChangeText={setMemberContact}
             autoCapitalize="none"
@@ -187,6 +194,7 @@ export default function EditGroupScreen() {
         style={{ marginTop: 10, marginBottom: 40 }}
       />
     </ScrollView>
+    <DoneBar nativeID={ACCESSORY_ID} />
     </KeyboardAvoidingView>
   );
 }

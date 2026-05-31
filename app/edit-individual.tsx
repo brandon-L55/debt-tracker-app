@@ -16,7 +16,10 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useContacts } from "@/context/ContactsContext";
 import { useTheme } from "@/context/ThemeContext";
 import { Avatar } from "@/components/Avatar";
+import { DoneBar } from "@/components/DoneBar";
 import { GradientButton } from "@/components/GradientButton";
+
+const ACCESSORY_ID = "edit-individual";
 
 export default function EditIndividualScreen() {
   const router = useRouter();
@@ -76,6 +79,7 @@ export default function EditIndividualScreen() {
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: t.bg }} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 110 : 20}>
       <ScrollView style={[styles.container, { backgroundColor: t.bg }]} contentContainerStyle={{ flexGrow: 1, padding: 20, paddingBottom: 260 }} keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"} showsVerticalScrollIndicator={false}>
+
       <View style={styles.avatarSection}>
         <View style={[styles.avatarRing, {
           borderColor: isDark ? "#7C3AED" : "#C4B5FD",
@@ -104,6 +108,7 @@ export default function EditIndividualScreen() {
           style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
           placeholder="Full name"
           placeholderTextColor={t.textMuted}
+          inputAccessoryViewID={ACCESSORY_ID}
           value={name}
           onChangeText={setName}
         />
@@ -115,6 +120,7 @@ export default function EditIndividualScreen() {
           style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
           placeholder="What do you call them?"
           placeholderTextColor={t.textMuted}
+          inputAccessoryViewID={ACCESSORY_ID}
           value={nickname}
           onChangeText={setNickname}
         />
@@ -126,6 +132,7 @@ export default function EditIndividualScreen() {
           style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
           placeholder="+1 555-000-0000 or @username"
           placeholderTextColor={t.textMuted}
+          inputAccessoryViewID={ACCESSORY_ID}
           value={phoneOrUsername}
           onChangeText={setPhoneOrUsername}
           autoCapitalize="none"
@@ -138,6 +145,7 @@ export default function EditIndividualScreen() {
           style={[styles.input, styles.textArea, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
           placeholder="Any notes about this person..."
           placeholderTextColor={t.textMuted}
+          inputAccessoryViewID={ACCESSORY_ID}
           value={notes}
           onChangeText={setNotes}
           multiline
@@ -150,6 +158,7 @@ export default function EditIndividualScreen() {
         style={{ marginTop: 10, marginBottom: 40 }}
       />
     </ScrollView>
+    <DoneBar nativeID={ACCESSORY_ID} />
     </KeyboardAvoidingView>
   );
 }

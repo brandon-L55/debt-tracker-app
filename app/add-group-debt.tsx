@@ -73,12 +73,19 @@ export default function AddGroupDebtScreen() {
     const perPersonAmount = splitEvenly ? parsedAmount / (selected.length + 1) : parsedAmount;
     for (const memberId of selected) {
       const member = group.members.find(m => m.id === memberId)!;
-      // Use the linked contact's canonical name so this debt appears in the
-      // Individual dashboard. Falls back to the member's display name.
-      const person = member.contactId
-        ? (individuals.find(i => i.id === member.contactId)?.name ?? member.name)
-        : member.name;
-      addDebt({ person, amount: parseFloat(perPersonAmount.toFixed(2)), direction, reason: reason.trim(), groupId: resolvedGroupId, deadline: deadlineISO });
+      const contact = member.contactId ? individuals.find(i => i.id === member.contactId) : null;
+      const person = contact?.name ?? member.name;
+      const isLinked = !!contact?.linkedUserId;
+      addDebt({
+        person,
+        amount: parseFloat(perPersonAmount.toFixed(2)),
+        direction,
+        reason: reason.trim(),
+        groupId: resolvedGroupId,
+        deadline: deadlineISO,
+        contactId: member.contactId,
+        status: isLinked ? undefined : "accepted",
+      });
     }
     router.replace(resolvedGroupId ? (`/group/${resolvedGroupId}` as any) : "/(tabs)/groups");
   }
@@ -128,6 +135,28 @@ export default function AddGroupDebtScreen() {
             );
           })}
         </View>
+        {selected.length > 0 && (
+          <View style={styles.memberHints}>
+            {selected.map(memberId => {
+              const member = group.members.find(m => m.id === memberId)!;
+              const contact = member.contactId ? individuals.find(i => i.id === member.contactId) : null;
+              const displayName = contact?.nickname || contact?.name || member.name;
+              const isLinked = !!contact?.linkedUserId;
+              return (
+                <View key={memberId} style={styles.memberHintRow}>
+                  <View style={[styles.memberHintDot, { backgroundColor: isLinked ? t.primary : t.border }]} />
+                  <Text style={[styles.memberHintText, { color: t.textSub }]}>
+                    {displayName}
+                    {" — "}
+                    <Text style={{ color: isLinked ? t.primary : t.textMuted }}>
+                      {isLinked ? "App user · request will be sent" : "Manual contact · no approval needed"}
+                    </Text>
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
         {group.members.length === 0 && <Text style={[styles.noMembers, { color: t.textMuted }]}>No members. Edit the group to add members.</Text>}
       </View>
 
@@ -249,6 +278,10 @@ const styles = StyleSheet.create({
   chip: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1.5 },
   chipText: { fontSize: 14, fontWeight: "600" },
   noMembers: { fontSize: 14, fontStyle: "italic" },
+  memberHints: { marginTop: 10, gap: 5 },
+  memberHintRow: { flexDirection: "row", alignItems: "center", gap: 7 },
+  memberHintDot: { width: 6, height: 6, borderRadius: 3, flexShrink: 0 },
+  memberHintText: { fontSize: 12, fontWeight: "500", flex: 1 },
   optionBtn: { padding: 16, borderRadius: 14, borderWidth: 1 },
   optionText: { fontSize: 16, fontWeight: "600" },
   splitBtn: { padding: 16, borderRadius: 14, borderWidth: 1, marginTop: 4 },

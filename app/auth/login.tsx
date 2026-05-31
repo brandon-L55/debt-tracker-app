@@ -13,6 +13,9 @@ import { useState } from "react";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
+import { DoneBar } from "@/components/DoneBar";
+
+const ACCESSORY_ID = "auth-login";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -56,7 +59,7 @@ export default function LoginScreen() {
       <ScrollView
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
+        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
       >
         <Text style={[styles.title, { color: t.text }]}>Welcome back</Text>
         <Text style={[styles.subtitle, { color: t.textSub }]}>
@@ -78,6 +81,7 @@ export default function LoginScreen() {
               keyboardType="email-address"
               textContentType="emailAddress"
               returnKeyType="next"
+              inputAccessoryViewID={ACCESSORY_ID}
             />
           </View>
 
@@ -93,6 +97,7 @@ export default function LoginScreen() {
               secureTextEntry
               textContentType="password"
               returnKeyType="go"
+              inputAccessoryViewID={ACCESSORY_ID}
               onSubmitEditing={handleLogin}
             />
           </View>
@@ -128,6 +133,7 @@ export default function LoginScreen() {
           </Pressable>
         </View>
       </ScrollView>
+      <DoneBar nativeID={ACCESSORY_ID} />
     </KeyboardAvoidingView>
   );
 }

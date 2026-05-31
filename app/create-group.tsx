@@ -14,9 +14,12 @@ import { useRouter } from "expo-router";
 import { useGroups } from "@/context/GroupsContext";
 import { useContacts } from "@/context/ContactsContext";
 import { useTheme } from "@/context/ThemeContext";
+import { DoneBar } from "@/components/DoneBar";
 import { GradientButton } from "@/components/GradientButton";
 import { Avatar } from "@/components/Avatar";
 import type { GroupMember } from "@/context/DebtContext";
+
+const ACCESSORY_ID = "create-group";
 
 export default function CreateGroupScreen() {
   const router = useRouter();
@@ -118,6 +121,7 @@ export default function CreateGroupScreen() {
             style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
             placeholder="e.g. Cabo Trip, Apartment, Dinner Club"
             placeholderTextColor={t.textMuted}
+            inputAccessoryViewID={ACCESSORY_ID}
             value={groupName}
             onChangeText={setGroupName}
           />
@@ -130,6 +134,7 @@ export default function CreateGroupScreen() {
             placeholder="What is this group for?"
             placeholderTextColor={t.textMuted}
             multiline
+            inputAccessoryViewID={ACCESSORY_ID}
             value={description}
             onChangeText={setDescription}
           />
@@ -142,6 +147,7 @@ export default function CreateGroupScreen() {
             style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text, marginBottom: 8 }]}
             placeholder="Name"
             placeholderTextColor={t.textMuted}
+            inputAccessoryViewID={ACCESSORY_ID}
             value={memberName}
             onChangeText={text => { setMemberName(text); setMemberContactId(null); }}
           />
@@ -173,6 +179,7 @@ export default function CreateGroupScreen() {
             style={[styles.input, { backgroundColor: memberContactId ? t.input : t.input, borderColor: t.border, color: t.text, marginBottom: 8, opacity: memberContactId ? 0.5 : 1 }]}
             placeholder={memberContactId ? "Contact selected" : "Phone or @username"}
             placeholderTextColor={t.textMuted}
+            inputAccessoryViewID={ACCESSORY_ID}
             value={memberContact}
             onChangeText={setMemberContact}
             autoCapitalize="none"
@@ -210,6 +217,7 @@ export default function CreateGroupScreen() {
           style={{ marginTop: 10, marginBottom: 40 }}
         />
       </ScrollView>
+      <DoneBar nativeID={ACCESSORY_ID} />
     </KeyboardAvoidingView>
   );
 }

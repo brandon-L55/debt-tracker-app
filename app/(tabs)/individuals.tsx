@@ -5,11 +5,11 @@ import { useFocusEffect, useRouter } from "expo-router";
 // @ts-ignore — forwardRef deprecation hint from React 19; library still works correctly
 import DraggableFlatList, { ScaleDecorator } from "react-native-draggable-flatlist";
 import type { RenderItemParams } from "react-native-draggable-flatlist";
+import { Plus, UserPlus } from "lucide-react-native";
 import { useDebts } from "@/context/DebtContext";
 import { useContacts } from "@/context/ContactsContext";
 import { useTheme } from "@/context/ThemeContext";
 import { Avatar } from "@/components/Avatar";
-import { GradientButton } from "@/components/GradientButton";
 import type { Individual, Debt } from "@/context/DebtContext";
 
 type SortOption = "az" | "za" | "latest-debt" | "owed-to-me" | "owed-to-them" | "custom";
@@ -216,13 +216,25 @@ export default function IndividualsScreen() {
 
   const listHeader = (
     <View>
-      <Text style={[styles.title, { color: t.text }]}>Friends</Text>
-      <Text style={[styles.subtitle, { color: t.textSub }]}>Manually added people will appear here.</Text>
-      <GradientButton
-        label="+ Add Friend"
-        onPress={() => router.push("/add-individual")}
-        style={{ marginBottom: 16 }}
-      />
+      <View style={styles.headerRow}>
+        <Text style={[styles.title, { color: t.text }]}>Friends</Text>
+        <View style={styles.headerActions}>
+          <Pressable
+            style={[styles.iconBtn, { backgroundColor: t.card, borderColor: t.border }]}
+            onPress={() => router.push("/add-friends" as any)}
+            hitSlop={8}
+          >
+            <UserPlus size={17} color={t.primary} />
+          </Pressable>
+          <Pressable
+            style={[styles.iconBtn, { backgroundColor: t.primary, borderColor: t.primary }]}
+            onPress={() => router.push("/add-individual")}
+            hitSlop={8}
+          >
+            <Plus size={17} color="#fff" />
+          </Pressable>
+        </View>
+      </View>
       <View style={[styles.searchRow]}>
         <TextInput
           style={[styles.searchInput, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
@@ -331,8 +343,10 @@ export default function IndividualsScreen() {
 
 const styles = StyleSheet.create({
   content: { padding: 24, paddingBottom: 48 },
-  title: { fontSize: 32, fontWeight: "800", marginTop: 60, letterSpacing: -0.5 },
-  subtitle: { fontSize: 15, marginTop: 6, marginBottom: 20 },
+  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 60, marginBottom: 20 },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+  iconBtn: { width: 38, height: 38, borderRadius: 19, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  title: { fontSize: 32, fontWeight: "800", letterSpacing: -0.5 },
   searchRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   searchInput: { flex: 1, borderRadius: 14, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 11, fontSize: 15 },
   sortBtn: { width: 46, height: 46, borderRadius: 14, borderWidth: 1, alignItems: "center", justifyContent: "center" },

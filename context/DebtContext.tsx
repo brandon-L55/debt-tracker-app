@@ -66,6 +66,8 @@ export type Individual = {
   createdAt: string;
   pinned?: boolean;
   silenced?: boolean;
+  /** Auth user id of the linked app account, if this contact has one. */
+  linkedUserId?: string;
 };
 
 type DebtContextType = {

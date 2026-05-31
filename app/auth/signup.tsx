@@ -13,6 +13,9 @@ import { useState } from "react";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
+import { DoneBar } from "@/components/DoneBar";
+
+const ACCESSORY_ID = "auth-signup";
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -88,7 +91,7 @@ export default function SignupScreen() {
       <ScrollView
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
+        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
       >
         <Text style={[styles.title, { color: t.text }]}>Create account</Text>
         <Text style={[styles.subtitle, { color: t.textSub }]}>
@@ -110,6 +113,7 @@ export default function SignupScreen() {
               keyboardType="email-address"
               textContentType="emailAddress"
               returnKeyType="next"
+              inputAccessoryViewID={ACCESSORY_ID}
             />
           </View>
 
@@ -125,6 +129,7 @@ export default function SignupScreen() {
               secureTextEntry
               textContentType="newPassword"
               returnKeyType="next"
+              inputAccessoryViewID={ACCESSORY_ID}
             />
           </View>
 
@@ -140,6 +145,7 @@ export default function SignupScreen() {
               secureTextEntry
               textContentType="newPassword"
               returnKeyType="go"
+              inputAccessoryViewID={ACCESSORY_ID}
               onSubmitEditing={handleSignup}
             />
           </View>
@@ -175,6 +181,7 @@ export default function SignupScreen() {
           </Pressable>
         </View>
       </ScrollView>
+      <DoneBar nativeID={ACCESSORY_ID} />
     </KeyboardAvoidingView>
   );
 }

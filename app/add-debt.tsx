@@ -68,6 +68,7 @@ type SelectedPerson = {
   name: string;        // canonical name: used for debt.person (must match individual.name)
   displayName: string; // chip label: nickname || name
   contactId?: string;  // when selected from contacts; skips resolvePersonForDebt
+  isLinked?: boolean;  // true when the contact has a real app account (linked_user_id set)
 };
 
 export default function AddDebtScreen() {
@@ -102,7 +103,7 @@ export default function AddDebtScreen() {
     const ind = individuals.find(i => i.id === prefillContactId);
     if (!ind) return;
     prefillApplied.current = true;
-    setPeople([{ name: ind.name, displayName: ind.nickname || ind.name, contactId: ind.id }]);
+    setPeople([{ name: ind.name, displayName: ind.nickname || ind.name, contactId: ind.id, isLinked: !!ind.linkedUserId }]);
   }, [prefillContactId, individuals]);
 
   const suggestions = useMemo<Individual[]>(() => {
@@ -139,7 +140,7 @@ export default function AddDebtScreen() {
       setPersonInput("");
       return;
     }
-    setPeople(prev => [...prev, { name: ind.name, displayName, contactId: ind.id }]);
+    setPeople(prev => [...prev, { name: ind.name, displayName, contactId: ind.id, isLinked: !!ind.linkedUserId }]);
     setPersonInput("");
   }
 
@@ -224,6 +225,7 @@ export default function AddDebtScreen() {
           deadline: deadlineISO,
           clientRequestId: saveRequestIdsRef.current[i],
           contactId: sp.contactId,
+          status: sp.isLinked ? undefined : "accepted",
         });
       }
       const emailPeople = effectivePeople.filter(p => !p.contactId && isEmail(p.name));
@@ -365,6 +367,22 @@ export default function AddDebtScreen() {
                       ×
                     </Text>
                   </Pressable>
+                </View>
+              ))}
+            </View>
+          )}
+          {people.length > 0 && (
+            <View style={styles.personHints}>
+              {people.map((p) => (
+                <View key={p.name} style={styles.personHintRow}>
+                  <View style={[styles.personHintDot, { backgroundColor: p.isLinked ? t.primary : t.border }]} />
+                  <Text style={[styles.personHintText, { color: t.textSub }]}>
+                    {p.displayName}
+                    {" — "}
+                    <Text style={{ color: p.isLinked ? t.primary : t.textMuted }}>
+                      {p.isLinked ? "App user · request will be sent" : "Manual contact · no approval needed"}
+                    </Text>
+                  </Text>
                 </View>
               ))}
             </View>
@@ -671,4 +689,8 @@ const styles = StyleSheet.create({
   suggestionText: { flex: 1 },
   suggestionName: { fontSize: 15, fontWeight: "600" },
   suggestionSub: { fontSize: 13, marginTop: 1 },
+  personHints: { marginTop: 10, gap: 5 },
+  personHintRow: { flexDirection: "row", alignItems: "center", gap: 7 },
+  personHintDot: { width: 6, height: 6, borderRadius: 3, flexShrink: 0 },
+  personHintText: { fontSize: 12, fontWeight: "500", flex: 1 },
 });

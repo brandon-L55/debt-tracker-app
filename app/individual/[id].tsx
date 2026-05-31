@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 
@@ -7,6 +7,7 @@ import { useDebts } from "@/context/DebtContext";
 import { useContacts } from "@/context/ContactsContext";
 import { useTheme } from "@/context/ThemeContext";
 import { Avatar } from "@/components/Avatar";
+import { DoneBar } from "@/components/DoneBar";
 import type { Debt } from "@/context/DebtContext";
 
 type DebtSortOption =
@@ -620,26 +621,30 @@ export default function IndividualDashboardScreen() {
 
       {/* Edit Pending Debt modal */}
       <Modal visible={editingDebt !== null} transparent animationType="fade" onRequestClose={() => { if (!editSaving) setEditingDebt(null); }}>
-        <Pressable style={styles.overlay} onPress={() => { if (!editSaving) setEditingDebt(null); }}>
-          <Pressable style={[styles.editModal, { backgroundColor: t.elevatedCard, borderColor: t.border }]} onPress={e => e.stopPropagation()}>
-            <Text style={[styles.editTitle, { color: t.text }]}>Edit Pending Debt</Text>
-            <TextInput style={[styles.editInput, { backgroundColor: t.input, borderColor: t.border, color: t.text }]} placeholder="Amount" placeholderTextColor={t.textMuted} keyboardType="decimal-pad" value={editAmount} onChangeText={setEditAmount} editable={!editSaving} />
-            <TextInput style={[styles.editInput, { backgroundColor: t.input, borderColor: t.border, color: t.text }]} placeholder="Reason" placeholderTextColor={t.textMuted} value={editReason} onChangeText={setEditReason} editable={!editSaving} />
-            <TextInput style={[styles.editInput, { backgroundColor: t.input, borderColor: t.border, color: t.text }]} placeholder="Due date (YYYY-MM-DD)" placeholderTextColor={t.textMuted} value={editDeadline} onChangeText={setEditDeadline} editable={!editSaving} />
-            <View style={styles.editActions}>
-              <Pressable style={[styles.editBtn, { backgroundColor: t.card, borderColor: t.border }]} onPress={() => setEditingDebt(null)} disabled={editSaving}>
-                <Text style={[styles.editBtnText, { color: t.text }]}>Cancel</Text>
-              </Pressable>
-              <Pressable style={[styles.editBtn, { backgroundColor: t.primarySoft, borderColor: t.primaryBorder, opacity: editSaving ? 0.6 : 1 }]} onPress={handleSaveDebtEdit} disabled={editSaving}>
-                <Text style={[styles.editBtnText, { color: t.primary }]}>{editSaving ? "Saving..." : "Save"}</Text>
-              </Pressable>
-            </View>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+          <Pressable style={styles.overlay} onPress={() => { if (!editSaving) setEditingDebt(null); }}>
+            <Pressable style={[styles.editModal, { backgroundColor: t.elevatedCard, borderColor: t.border }]} onPress={e => e.stopPropagation()}>
+              <Text style={[styles.editTitle, { color: t.text }]}>Edit Pending Debt</Text>
+              <TextInput style={[styles.editInput, { backgroundColor: t.input, borderColor: t.border, color: t.text }]} placeholder="Amount" placeholderTextColor={t.textMuted} keyboardType="decimal-pad" inputAccessoryViewID="individual-edit-debt" value={editAmount} onChangeText={setEditAmount} editable={!editSaving} />
+              <TextInput style={[styles.editInput, { backgroundColor: t.input, borderColor: t.border, color: t.text }]} placeholder="Reason" placeholderTextColor={t.textMuted} inputAccessoryViewID="individual-edit-debt" value={editReason} onChangeText={setEditReason} editable={!editSaving} />
+              <TextInput style={[styles.editInput, { backgroundColor: t.input, borderColor: t.border, color: t.text }]} placeholder="Due date (YYYY-MM-DD)" placeholderTextColor={t.textMuted} inputAccessoryViewID="individual-edit-debt" value={editDeadline} onChangeText={setEditDeadline} editable={!editSaving} />
+              <View style={styles.editActions}>
+                <Pressable style={[styles.editBtn, { backgroundColor: t.card, borderColor: t.border }]} onPress={() => setEditingDebt(null)} disabled={editSaving}>
+                  <Text style={[styles.editBtnText, { color: t.text }]}>Cancel</Text>
+                </Pressable>
+                <Pressable style={[styles.editBtn, { backgroundColor: t.primarySoft, borderColor: t.primaryBorder, opacity: editSaving ? 0.6 : 1 }]} onPress={handleSaveDebtEdit} disabled={editSaving}>
+                  <Text style={[styles.editBtnText, { color: t.primary }]}>{editSaving ? "Saving..." : "Save"}</Text>
+                </Pressable>
+              </View>
+            </Pressable>
           </Pressable>
-        </Pressable>
+        </KeyboardAvoidingView>
+        <DoneBar nativeID="individual-edit-debt" />
       </Modal>
 
       {/* Pay Debt modal */}
       <Modal visible={payingDebt !== null} transparent animationType="slide" onRequestClose={() => { if (!payLoading) setPayingDebt(null); }}>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
         <Pressable style={styles.overlay} onPress={() => { if (!payLoading) setPayingDebt(null); }}>
           <Pressable style={[styles.addPayModal, { backgroundColor: t.elevatedCard, borderColor: t.border }]} onPress={e => e.stopPropagation()}>
             <Text style={[styles.addPayTitle, { color: t.text }]}>Pay Debt</Text>
@@ -713,6 +718,7 @@ export default function IndividualDashboardScreen() {
                 placeholder="Custom %"
                 placeholderTextColor={t.textMuted}
                 keyboardType="decimal-pad"
+                inputAccessoryViewID="individual-pay"
                 value={payPctCustom}
                 onChangeText={text => {
                   setPayPctCustom(text);
@@ -739,6 +745,7 @@ export default function IndividualDashboardScreen() {
               placeholder="Or enter amount (e.g. 5.00)"
               placeholderTextColor={t.textMuted}
               keyboardType="decimal-pad"
+              inputAccessoryViewID="individual-pay"
               value={payInputAmount}
               onChangeText={text => {
                 setPayInputAmount(text);
@@ -761,6 +768,8 @@ export default function IndividualDashboardScreen() {
             </View>
           </Pressable>
         </Pressable>
+        </KeyboardAvoidingView>
+        <DoneBar nativeID="individual-pay" />
       </Modal>
     </>
   );

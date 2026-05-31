@@ -6,7 +6,10 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import { useTheme } from "@/context/ThemeContext";
 import { Avatar } from "@/components/Avatar";
+import { DoneBar } from "@/components/DoneBar";
 import { useProfile } from "@/context/ProfileContext";
+
+const ACCESSORY_ID = "settings-profile";
 
 export default function ProfileSettingsScreen() {
   const { colors: t } = useTheme();
@@ -87,6 +90,7 @@ export default function ProfileSettingsScreen() {
             style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
             placeholder="Your name"
             placeholderTextColor={t.textMuted}
+            inputAccessoryViewID={ACCESSORY_ID}
             value={form.display_name}
             onChangeText={v => setForm(f => ({ ...f, display_name: v }))}
           />
@@ -100,6 +104,7 @@ export default function ProfileSettingsScreen() {
             placeholderTextColor={t.textMuted}
             autoCapitalize="none"
             autoCorrect={false}
+            inputAccessoryViewID={ACCESSORY_ID}
             value={form.username}
             onChangeText={v => setForm(f => ({ ...f, username: v.replace(/\s/g, "") }))}
           />
@@ -112,6 +117,7 @@ export default function ProfileSettingsScreen() {
             placeholder="+1 (555) 000-0000"
             placeholderTextColor={t.textMuted}
             keyboardType="phone-pad"
+            inputAccessoryViewID={ACCESSORY_ID}
             value={form.phone}
             onChangeText={v => setForm(f => ({ ...f, phone: v }))}
           />
@@ -130,6 +136,7 @@ export default function ProfileSettingsScreen() {
           </Text>
         </Pressable>
       </ScrollView>
+      <DoneBar nativeID={ACCESSORY_ID} />
     </KeyboardAvoidingView>
   );
 }

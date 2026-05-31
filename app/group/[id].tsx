@@ -1,11 +1,12 @@
 import { useState, useMemo } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useDebts } from "@/context/DebtContext";
 import { useGroups } from "@/context/GroupsContext";
+import { useContacts } from "@/context/ContactsContext";
 import { useTheme } from "@/context/ThemeContext";
 import { Avatar } from "@/components/Avatar";
-import type { Debt } from "@/context/DebtContext";
+import type { Debt, GroupMember } from "@/context/DebtContext";
 
 type DebtSortOption =
   | "date" | "deadline-soonest" | "deadline-latest"
@@ -61,6 +62,8 @@ function sortDebts(debts: Debt[], sort: DebtSortOption, td: string): Debt[] {
   });
 }
 
+const PAGE_SIZE = 8;
+
 function statusStyle(status: string) {
   switch (status) {
     case "paid": return { backgroundColor: "#16A34A" };
@@ -76,9 +79,13 @@ export default function GroupDashboardScreen() {
   const router = useRouter();
   const { debts } = useDebts();
   const { groups } = useGroups();
+  const { individuals, addIndividual } = useContacts();
   const { colors: t } = useTheme();
   const [sort, setSort] = useState<DebtSortOption>("date");
   const [showSortMenu, setShowSortMenu] = useState(false);
+  const [membersExpanded, setMembersExpanded] = useState(false);
+  const [visibleMemberCount, setVisibleMemberCount] = useState(PAGE_SIZE);
+  const [addingIds, setAddingIds] = useState<Set<string>>(() => new Set());
 
   const td = today();
   const groupId = Array.isArray(id) ? id[0] : id;
@@ -90,6 +97,71 @@ export default function GroupDashboardScreen() {
         <Text style={{ color: t.textMuted, fontSize: 16 }}>Group not found.</Text>
       </View>
     );
+  }
+
+  const totalMembers = group.members.length;
+  const hasMoreThanPage = totalMembers > PAGE_SIZE;
+  const allMembersVisible = visibleMemberCount >= totalMembers;
+  const atMinMembers = visibleMemberCount <= PAGE_SIZE;
+  const visibleMembers = group.members.slice(0, visibleMemberCount);
+
+  function findContactForMember(m: GroupMember) {
+    if (m.contactId) {
+      const byId = individuals.find(i => i.id === m.contactId);
+      if (byId) return byId;
+    }
+    const nameLower = m.name.toLowerCase();
+    const byName = individuals.find(i =>
+      i.name.toLowerCase() === nameLower ||
+      (i.nickname && i.nickname.toLowerCase() === nameLower)
+    );
+    if (byName) return byName;
+    if (m.phoneOrUsername) {
+      const pouLower = m.phoneOrUsername.toLowerCase();
+      return individuals.find(i => i.phoneOrUsername && i.phoneOrUsername.toLowerCase() === pouLower);
+    }
+    return undefined;
+  }
+
+  async function handleAddMember(m: GroupMember) {
+    if (addingIds.has(m.id)) return;
+    setAddingIds(prev => new Set(prev).add(m.id));
+    try {
+      await addIndividual({
+        name: m.name,
+        nickname: "",
+        phoneOrUsername: m.phoneOrUsername || "",
+        notes: "",
+        pinned: false,
+        silenced: false,
+      });
+    } catch (e: any) {
+      Alert.alert("Error", e?.message ?? "Could not add contact.");
+    } finally {
+      setAddingIds(prev => { const n = new Set(prev); n.delete(m.id); return n; });
+    }
+  }
+
+  function toggleMembers() {
+    if (membersExpanded) {
+      setMembersExpanded(false);
+      setVisibleMemberCount(PAGE_SIZE);
+    } else {
+      setMembersExpanded(true);
+    }
+  }
+  function showMoreMembers() {
+    setVisibleMemberCount(c => Math.min(c + PAGE_SIZE, totalMembers));
+  }
+  function showLessMembers() {
+    setVisibleMemberCount(c => Math.max(c - PAGE_SIZE, PAGE_SIZE));
+  }
+  function showAllMembers() {
+    setVisibleMemberCount(totalMembers);
+  }
+  function showNoMembers() {
+    setMembersExpanded(false);
+    setVisibleMemberCount(PAGE_SIZE);
   }
 
   const groupDebts = debts.filter(d => d.groupId === groupId);
@@ -124,11 +196,96 @@ export default function GroupDashboardScreen() {
           <Avatar name={group.name} imageUri={group.imageUri} size={72} />
           <View style={{ flex: 1 }}>
             <Text style={[styles.groupName, { color: t.text }]}>{group.name}</Text>
-            <Text style={[styles.groupSub, { color: t.textSub }]}>
-              {group.description || `${group.members.length} ${group.members.length === 1 ? "member" : "members"}`}
-            </Text>
+            {group.description ? (
+              <Text style={[styles.groupSub, { color: t.textSub }]}>{group.description}</Text>
+            ) : null}
+            <Pressable onPress={toggleMembers} hitSlop={8}>
+              <Text style={[styles.memberCountBtn, { color: t.primary }]}>
+                {`${totalMembers} ${totalMembers === 1 ? "member" : "members"} · Tap to ${membersExpanded ? "collapse" : "expand"}`}
+              </Text>
+            </Pressable>
           </View>
         </View>
+
+        {membersExpanded && (
+          <View style={[styles.memberCard, { backgroundColor: t.card, borderColor: t.border }]}>
+            {visibleMembers.map((m, i) => {
+              const contact = findContactForMember(m);
+              const isAdding = addingIds.has(m.id);
+              const borderStyle = i < visibleMembers.length - 1
+                ? { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: t.border }
+                : undefined;
+
+              if (contact) {
+                return (
+                  <Pressable
+                    key={m.id}
+                    style={[styles.memberListRow, borderStyle]}
+                    onPress={() => router.push(`/individual/${contact.id}` as any)}
+                  >
+                    <Avatar name={contact.name} imageUri={contact.imageUri} size={32} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.memberListName, { color: t.text }]}>
+                        {contact.nickname || contact.name}
+                      </Text>
+                      {contact.phoneOrUsername ? (
+                        <Text style={[styles.memberListSub, { color: t.textMuted }]}>{contact.phoneOrUsername}</Text>
+                      ) : null}
+                    </View>
+                    <Text style={[styles.memberChevron, { color: t.primary }]}>›</Text>
+                  </Pressable>
+                );
+              }
+
+              // TODO: "Pending" and "Accept" states require a real friend-request system.
+              // Currently, Add immediately creates a local contact record.
+              return (
+                <View key={m.id} style={[styles.memberListRow, borderStyle]}>
+                  <Avatar name={m.name} size={32} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.memberListName, { color: t.text }]}>{m.name}</Text>
+                    {m.phoneOrUsername ? (
+                      <Text style={[styles.memberListSub, { color: t.textMuted }]}>{m.phoneOrUsername}</Text>
+                    ) : null}
+                  </View>
+                  <Pressable
+                    style={[styles.memberAddBtn, { backgroundColor: t.primarySoft, borderColor: t.primaryBorder, opacity: isAdding ? 0.6 : 1 }]}
+                    onPress={() => handleAddMember(m)}
+                    disabled={isAdding}
+                    hitSlop={8}
+                  >
+                    <Text style={[styles.memberAddText, { color: t.primary }]}>
+                      {isAdding ? "Adding…" : "Add"}
+                    </Text>
+                  </Pressable>
+                </View>
+              );
+            })}
+            {hasMoreThanPage && (
+              <View style={[styles.memberControls, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.border }]}>
+                {!atMinMembers && (
+                  <Pressable style={[styles.memberCtrlBtn, { backgroundColor: t.card, borderColor: t.border }]} onPress={showLessMembers}>
+                    <Text style={[styles.memberCtrlText, { color: t.textSub }]}>Show Less</Text>
+                  </Pressable>
+                )}
+                {!allMembersVisible && (
+                  <Pressable style={[styles.memberCtrlBtn, { backgroundColor: t.card, borderColor: t.border }]} onPress={showMoreMembers}>
+                    <Text style={[styles.memberCtrlText, { color: t.primary }]}>Show More</Text>
+                  </Pressable>
+                )}
+                {allMembersVisible ? (
+                  <Pressable style={[styles.memberCtrlBtn, { backgroundColor: t.card, borderColor: t.border }]} onPress={showNoMembers}>
+                    <Text style={[styles.memberCtrlText, { color: t.textSub }]}>Show None</Text>
+                  </Pressable>
+                ) : (
+                  <Pressable style={[styles.memberCtrlBtn, { backgroundColor: t.primarySoft, borderColor: t.primaryBorder }]} onPress={showAllMembers}>
+                    <Text style={[styles.memberCtrlText, { color: t.primary }]}>Show All</Text>
+                  </Pressable>
+                )}
+              </View>
+            )}
+          </View>
+        )}
 
         <View style={styles.cardRow}>
           <View style={[styles.summaryCard, { backgroundColor: t.redSoft, borderColor: t.redBorder }]}>
@@ -199,7 +356,7 @@ export default function GroupDashboardScreen() {
           ) : displayDebts.map(debt => {
             const dl = dlInfo(debt.deadline, td);
             return (
-              <View key={debt.id} style={[styles.txRow, { backgroundColor: t.card, borderColor: t.border }]}>
+              <Pressable key={debt.id} style={[styles.txRow, { backgroundColor: t.card, borderColor: t.border }]} onPress={() => router.push(`/debt/${debt.id}` as any)}>
                 <View style={styles.txLeft}>
                   <Text style={[styles.txPerson, { color: t.text }]}>{debt.person}</Text>
                   {debt.reason ? <Text style={[styles.txReason, { color: t.textSub }]}>{debt.reason}</Text> : null}
@@ -217,7 +374,7 @@ export default function GroupDashboardScreen() {
                   </Text>
                   <Text style={[styles.txDir, { color: t.textSub }]}>{debt.direction === "me" ? "You owe" : "Owes you"}</Text>
                 </View>
-              </View>
+              </Pressable>
             );
           })}
         </View>
@@ -247,6 +404,17 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", gap: 16, marginBottom: 20, marginTop: 8 },
   groupName: { fontSize: 24, fontWeight: "700" },
   groupSub: { fontSize: 14, marginTop: 2 },
+  memberCountBtn: { fontSize: 13, fontWeight: "600", marginTop: 4 },
+  memberCard: { borderRadius: 14, borderWidth: 1, marginBottom: 16, overflow: "hidden" },
+  memberListRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 10 },
+  memberListName: { fontSize: 14, fontWeight: "600" },
+  memberListSub: { fontSize: 12, marginTop: 1 },
+  memberChevron: { fontSize: 20, fontWeight: "300", paddingLeft: 4 },
+  memberAddBtn: { borderRadius: 14, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 5 },
+  memberAddText: { fontSize: 12, fontWeight: "700" },
+  memberControls: { flexDirection: "row", flexWrap: "wrap", gap: 8, padding: 12 },
+  memberCtrlBtn: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 6 },
+  memberCtrlText: { fontSize: 12, fontWeight: "600" },
   cardRow: { flexDirection: "row", gap: 12, marginBottom: 16 },
   summaryCard: { flex: 1, borderRadius: 16, padding: 18, borderWidth: 1 },
   summaryLabel: { fontSize: 13 },

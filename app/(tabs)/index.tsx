@@ -300,11 +300,11 @@ export default function HomeScreen() {
                 const showActions = debt.status === "pending" && !!currentUserId && debt.creatorId !== currentUserId;
                 const showCreatorActions = debt.status === "pending" && !!currentUserId && debt.creatorId === currentUserId;
                 return (
-                  <View key={debt.id} style={[styles.debtRow, {
+                  <Pressable key={debt.id} style={[styles.debtRow, {
                     backgroundColor: t.card,
                     borderColor: showActions || showCreatorActions ? t.primaryBorder : t.border,
                     ...(isDark ? { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 3 } : { shadowColor: "#7C3AED", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 1 }),
-                  }]}>
+                  }]} onPress={() => router.push(`/debt/${debt.id}` as any)}>
                     <View style={styles.debtRowContent}>
                       <View style={styles.debtLeft}>
                         <Text style={[styles.debtPerson, { color: t.text }]}>{debt.person}</Text>
@@ -356,7 +356,7 @@ export default function HomeScreen() {
                         </Pressable>
                       </View>
                     )}
-                  </View>
+                  </Pressable>
                 );
               })}
               {visibleDebtCount < filteredDebts.length && (

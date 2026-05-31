@@ -79,6 +79,7 @@ function AppShell() {
         <Stack.Screen name="add-individual" options={safeBackOptions('Add Friend')} />
         <Stack.Screen name="add-friends" options={safeBackOptions('Add Friends')} />
         <Stack.Screen name="create-group" options={safeBackOptions('Create Group')} />
+        <Stack.Screen name="debt/[id]" options={{ title: '' }} />
         <Stack.Screen name="group/[id]" options={{ title: '' }} />
         <Stack.Screen name="individual/[id]" options={{ title: '' }} />
         <Stack.Screen name="add-group-debt" options={safeBackOptions('Add Group Debt')} />

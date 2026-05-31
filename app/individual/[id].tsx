@@ -398,7 +398,7 @@ export default function IndividualDashboardScreen() {
           const canMarkManually = canMakePayment && !isLinked;
           const canUndoPaid = debt.direction === "me" && !!debt.manuallyPaid && debt.status === "paid";
           return (
-            <View key={debt.id} style={[styles.txRow, { backgroundColor: t.card, borderColor: showActions || showCreatorActions ? t.primaryBorder : t.border }]}>
+            <Pressable key={debt.id} style={[styles.txRow, { backgroundColor: t.card, borderColor: showActions || showCreatorActions ? t.primaryBorder : t.border }]} onPress={() => router.push(`/debt/${debt.id}` as any)}>
               <View style={styles.txRowContent}>
                 <View style={styles.txLeft}>
                   {debt.reason ? <Text style={[styles.txReason, { color: t.text }]}>{debt.reason}</Text>
@@ -487,7 +487,7 @@ export default function IndividualDashboardScreen() {
                   </Pressable>
                 </View>
               )}
-            </View>
+            </Pressable>
           );
         })}
       </ScrollView>

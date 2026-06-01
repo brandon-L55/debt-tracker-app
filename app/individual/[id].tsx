@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
@@ -8,6 +8,7 @@ import { useContacts } from "@/context/ContactsContext";
 import { useTheme } from "@/context/ThemeContext";
 import { Avatar } from "@/components/Avatar";
 import { DoneBar } from "@/components/DoneBar";
+import { sendNudge } from "@/lib/services/nudgeService";
 import type { Debt } from "@/context/DebtContext";
 
 type DebtSortOption =
@@ -115,6 +116,11 @@ export default function IndividualDashboardScreen() {
   const [editReason, setEditReason] = useState("");
   const [editDeadline, setEditDeadline] = useState("");
   const [editSaving, setEditSaving] = useState(false);
+
+  const [nudgeLoading, setNudgeLoading] = useState(false);
+  const [nudgeCooldown, setNudgeCooldown] = useState(false);
+  const nudgeCooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (nudgeCooldownRef.current) clearTimeout(nudgeCooldownRef.current); }, []);
 
   function startPaymentSubmit(debtId: string, clientRequestId: string) {
     if (paymentSubmittingRef.current.has(debtId)) return null;
@@ -252,6 +258,40 @@ export default function IndividualDashboardScreen() {
   const displayDebts = sortDebts(personDebts, sort, td);
   const activeSortLabel = DEBT_SORT_OPTIONS.find(o => o.value === sort)?.label ?? "";
 
+  async function handleNudge() {
+    if (!person || nudgeLoading || nudgeCooldown) return;
+    const displayName = person.nickname || person.name;
+
+    if (owedToMe <= 0) {
+      Alert.alert("Nothing to nudge", `${displayName} doesn't owe you anything right now.`);
+      return;
+    }
+    if (!person.linkedUserId) {
+      Alert.alert(
+        "Can't send nudge",
+        `${displayName} doesn't have an account yet, so they cannot receive an in-app nudge.`,
+      );
+      return;
+    }
+
+    setNudgeLoading(true);
+    try {
+      await sendNudge({
+        recipientUserId: person.linkedUserId,
+        contactId: person.id,
+        amountCents: Math.round(owedToMe * 100),
+        displayName,
+      });
+      Alert.alert("Nudge sent.", `${displayName} has been reminded to pay $${owedToMe.toFixed(2)}.`);
+      setNudgeCooldown(true);
+      nudgeCooldownRef.current = setTimeout(() => setNudgeCooldown(false), 10_000);
+    } catch (e: any) {
+      Alert.alert("Couldn't send nudge", e?.message ?? "Something went wrong. Please try again.");
+    } finally {
+      setNudgeLoading(false);
+    }
+  }
+
   function resetAndClosePartial() {
     setShowPayPartialModal(false);
     setPayPartialMode("dollar");
@@ -351,20 +391,17 @@ export default function IndividualDashboardScreen() {
             </LinearGradient>
           </Pressable>
           <Pressable
-            style={[styles.actionBtnSecondary, { borderColor: t.border }]}
-            onPress={() => {
-              const displayName = person.nickname || person.name;
-              if (owedToMe <= 0) {
-                Alert.alert("Nothing to nudge", `${displayName} doesn't owe you anything right now.`);
-                return;
-              }
-              Alert.alert(
-                "Nudge sent!",
-                `Reminder sent to ${displayName}: "You owe $${owedToMe.toFixed(2)}. Please pay when you get a chance!"`,
-              );
-            }}
+            style={[
+              styles.actionBtnSecondary,
+              { borderColor: t.border },
+              (owedToMe <= 0 || nudgeLoading || nudgeCooldown) && { opacity: 0.45 },
+            ]}
+            onPress={handleNudge}
+            disabled={nudgeLoading || nudgeCooldown}
           >
-            <Text style={[styles.actionBtnSecText, { color: t.text }]}>Nudge</Text>
+            <Text style={[styles.actionBtnSecText, { color: t.text }]}>
+              {nudgeLoading ? "Sending…" : nudgeCooldown ? "Nudged ✓" : "Nudge"}
+            </Text>
           </Pressable>
         </View>
 

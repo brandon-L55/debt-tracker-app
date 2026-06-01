@@ -1,11 +1,13 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useDebts } from "@/context/DebtContext";
 import { useGroups } from "@/context/GroupsContext";
 import { useContacts } from "@/context/ContactsContext";
 import { useTheme } from "@/context/ThemeContext";
 import { Avatar } from "@/components/Avatar";
+import { sendNudge } from "@/lib/services/nudgeService";
 import type { Debt, GroupMember } from "@/context/DebtContext";
 
 type DebtSortOption =
@@ -77,7 +79,7 @@ function statusStyle(status: string) {
 export default function GroupDashboardScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { debts } = useDebts();
+  const { debts, currentUserId } = useDebts();
   const { groups } = useGroups();
   const { individuals, addIndividual } = useContacts();
   const { colors: t } = useTheme();
@@ -86,6 +88,21 @@ export default function GroupDashboardScreen() {
   const [membersExpanded, setMembersExpanded] = useState(false);
   const [visibleMemberCount, setVisibleMemberCount] = useState(PAGE_SIZE);
   const [addingIds, setAddingIds] = useState<Set<string>>(() => new Set());
+
+  // Group-level nudge state
+  const [nudgeLoading, setNudgeLoading] = useState(false);
+  const [nudgeCooldown, setNudgeCooldown] = useState(false);
+  const nudgeCooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Per-member nudge state
+  const [memberNudgeLoadingIds, setMemberNudgeLoadingIds] = useState<Set<string>>(() => new Set());
+  const [memberNudgeCooldownIds, setMemberNudgeCooldownIds] = useState<Set<string>>(() => new Set());
+  const memberNudgeCooldownTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  useEffect(() => () => {
+    if (nudgeCooldownRef.current) clearTimeout(nudgeCooldownRef.current);
+    memberNudgeCooldownTimers.current.forEach(t => clearTimeout(t));
+  }, []);
 
   const td = today();
   const groupId = Array.isArray(id) ? id[0] : id;
@@ -176,6 +193,107 @@ export default function GroupDashboardScreen() {
   const iOweMembers = memberBalances.filter(mb => mb.balance < 0);
   const oweMeMembers = memberBalances.filter(mb => mb.balance > 0);
 
+  // Members who owe me money AND have a linked account — eligible for nudge
+  const nudgeEligibleMembers = oweMeMembers.map(({ member, balance }) => {
+    const contact = findContactForMember(member);
+    return { member, balance, contact, linkedUserId: contact?.linkedUserId ?? null };
+  });
+  const hasAnyOwingMe = oweMeMembers.length > 0;
+  const groupNudgeDisabled = nudgeLoading || nudgeCooldown || !hasAnyOwingMe;
+
+  async function handleGroupNudge() {
+    if (!group || nudgeLoading || nudgeCooldown) return;
+    if (!hasAnyOwingMe) {
+      Alert.alert("Nothing to nudge", "Nobody in this group currently owes you money.");
+      return;
+    }
+
+    setNudgeLoading(true);
+    let sent = 0;
+    let skipped = 0;
+    try {
+      await Promise.all(
+        nudgeEligibleMembers.map(async ({ member, balance, contact, linkedUserId }) => {
+          if (!linkedUserId) { skipped++; return; }
+          await sendNudge({
+            recipientUserId: linkedUserId,
+            contactId: contact?.id ?? member.id,
+            amountCents: Math.round(balance * 100),
+            displayName: member.name,
+            groupId,
+            groupName: group.name,
+          });
+          sent++;
+        })
+      );
+
+      if (sent === 0 && skipped > 0) {
+        Alert.alert(
+          "Couldn't send nudges",
+          "People owe you money, but they do not have accounts yet, so they cannot receive in-app nudges.",
+        );
+      } else if (sent > 0 && skipped > 0) {
+        Alert.alert(
+          `Nudged ${sent} ${sent === 1 ? "person" : "people"}.`,
+          `${skipped} ${skipped === 1 ? "person does" : "people do"} not have accounts yet.`,
+        );
+        setNudgeCooldown(true);
+        nudgeCooldownRef.current = setTimeout(() => setNudgeCooldown(false), 10_000);
+      } else if (sent > 0) {
+        Alert.alert(`Nudged ${sent} ${sent === 1 ? "person" : "people"}.`);
+        setNudgeCooldown(true);
+        nudgeCooldownRef.current = setTimeout(() => setNudgeCooldown(false), 10_000);
+      }
+    } catch (e: any) {
+      Alert.alert("Couldn't send nudges", e?.message ?? "Something went wrong. Please try again.");
+    } finally {
+      setNudgeLoading(false);
+    }
+  }
+
+  async function handleMemberNudge(member: GroupMember, balance: number) {
+    if (!group) return;
+    const memberId = member.id;
+    if (memberNudgeLoadingIds.has(memberId) || memberNudgeCooldownIds.has(memberId)) return;
+
+    const contact = findContactForMember(member);
+
+    if (balance <= 0) {
+      Alert.alert("Nothing to nudge", `${member.name} doesn't owe you anything right now.`);
+      return;
+    }
+    if (!contact?.linkedUserId) {
+      Alert.alert(
+        "Can't send nudge",
+        `${member.name} doesn't have an account yet, so they cannot receive an in-app nudge.`,
+      );
+      return;
+    }
+
+    setMemberNudgeLoadingIds(prev => new Set(prev).add(memberId));
+    try {
+      await sendNudge({
+        recipientUserId: contact.linkedUserId,
+        contactId: contact.id,
+        amountCents: Math.round(balance * 100),
+        displayName: member.name,
+        groupId,
+        groupName: group.name,
+      });
+      Alert.alert("Nudge sent.", `${member.name} has been reminded to pay $${balance.toFixed(2)}.`);
+      setMemberNudgeCooldownIds(prev => new Set(prev).add(memberId));
+      const timer = setTimeout(() => {
+        setMemberNudgeCooldownIds(prev => { const n = new Set(prev); n.delete(memberId); return n; });
+        memberNudgeCooldownTimers.current.delete(memberId);
+      }, 10_000);
+      memberNudgeCooldownTimers.current.set(memberId, timer);
+    } catch (e: any) {
+      Alert.alert("Couldn't send nudge", e?.message ?? "Something went wrong. Please try again.");
+    } finally {
+      setMemberNudgeLoadingIds(prev => { const n = new Set(prev); n.delete(memberId); return n; });
+    }
+  }
+
   const displayDebts = useMemo(() => sortDebts(groupDebts, sort, td), [debts, sort, groupId]);
   const activeSortLabel = DEBT_SORT_OPTIONS.find(o => o.value === sort)?.label ?? "";
 
@@ -216,7 +334,16 @@ export default function GroupDashboardScreen() {
                 ? { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: t.border }
                 : undefined;
 
+              // Calculate this member's balance in the group
+              const memberBal = groupDebts.filter(d => d.person === m.name)
+                .reduce((s, d) => s + (d.direction === "them" ? d.amount : -d.amount), 0);
+              const memberOwesMe = memberBal > 0;
+              const isNudgingMember = memberNudgeLoadingIds.has(m.id);
+              const isMemberCoolingDown = memberNudgeCooldownIds.has(m.id);
+
               if (contact) {
+                const canNudge = memberOwesMe && !!contact.linkedUserId;
+                const nudgeDimmed = !memberOwesMe || isNudgingMember || isMemberCoolingDown;
                 return (
                   <Pressable
                     key={m.id}
@@ -232,13 +359,27 @@ export default function GroupDashboardScreen() {
                         <Text style={[styles.memberListSub, { color: t.textMuted }]}>{contact.phoneOrUsername}</Text>
                       ) : null}
                     </View>
+                    <Pressable
+                      style={[
+                        styles.memberNudgeBtn,
+                        { borderColor: canNudge && !nudgeDimmed ? t.primaryBorder : t.border },
+                        nudgeDimmed && { opacity: 0.4 },
+                      ]}
+                      onPress={() => handleMemberNudge(m, memberBal)}
+                      disabled={isNudgingMember || isMemberCoolingDown}
+                      hitSlop={8}
+                    >
+                      <Text style={[styles.memberNudgeText, { color: canNudge && !nudgeDimmed ? t.primary : t.textMuted }]}>
+                        {isNudgingMember ? "…" : isMemberCoolingDown ? "✓" : "Nudge"}
+                      </Text>
+                    </Pressable>
                     <Text style={[styles.memberChevron, { color: t.primary }]}>›</Text>
                   </Pressable>
                 );
               }
 
-              // TODO: "Pending" and "Accept" states require a real friend-request system.
-              // Currently, Add immediately creates a local contact record.
+              // Member not in contacts — show Add + Nudge
+              const nudgeDimmed = !memberOwesMe || isNudgingMember || isMemberCoolingDown;
               return (
                 <View key={m.id} style={[styles.memberListRow, borderStyle]}>
                   <Avatar name={m.name} size={32} />
@@ -248,6 +389,20 @@ export default function GroupDashboardScreen() {
                       <Text style={[styles.memberListSub, { color: t.textMuted }]}>{m.phoneOrUsername}</Text>
                     ) : null}
                   </View>
+                  <Pressable
+                    style={[
+                      styles.memberNudgeBtn,
+                      { borderColor: t.border },
+                      nudgeDimmed && { opacity: 0.4 },
+                    ]}
+                    onPress={() => handleMemberNudge(m, memberBal)}
+                    disabled={isNudgingMember || isMemberCoolingDown}
+                    hitSlop={8}
+                  >
+                    <Text style={[styles.memberNudgeText, { color: t.textMuted }]}>
+                      {isNudgingMember ? "…" : isMemberCoolingDown ? "✓" : "Nudge"}
+                    </Text>
+                  </Pressable>
                   <Pressable
                     style={[styles.memberAddBtn, { backgroundColor: t.primarySoft, borderColor: t.primaryBorder, opacity: isAdding ? 0.6 : 1 }]}
                     onPress={() => handleAddMember(m)}
@@ -298,10 +453,30 @@ export default function GroupDashboardScreen() {
           </View>
         </View>
 
-        <Pressable style={[styles.addBtn, { backgroundColor: t.primary }]}
-          onPress={() => router.push(`/add-group-debt?groupId=${groupId}` as any)}>
-          <Text style={styles.addBtnText}>+ Add Group Debt</Text>
-        </Pressable>
+        {/* Quick-action row: Add Debt + Nudge */}
+        <View style={styles.actionRow}>
+          <Pressable
+            style={styles.actionBtnPrimary}
+            onPress={() => router.push(`/add-group-debt?groupId=${groupId}` as any)}
+          >
+            <LinearGradient colors={[t.from, t.to] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionBtnGrad}>
+              <Text style={styles.actionBtnPrimText}>+ Add Debt</Text>
+            </LinearGradient>
+          </Pressable>
+          <Pressable
+            style={[
+              styles.actionBtnSecondary,
+              { borderColor: t.border },
+              groupNudgeDisabled && { opacity: 0.45 },
+            ]}
+            onPress={handleGroupNudge}
+            disabled={nudgeLoading || nudgeCooldown}
+          >
+            <Text style={[styles.actionBtnSecText, { color: t.text }]}>
+              {nudgeLoading ? "Sending…" : nudgeCooldown ? "Nudged ✓" : "Nudge"}
+            </Text>
+          </Pressable>
+        </View>
 
         {(iOweMembers.length > 0 || oweMeMembers.length > 0) && (
           <View style={styles.section}>
@@ -412,6 +587,8 @@ const styles = StyleSheet.create({
   memberChevron: { fontSize: 20, fontWeight: "300", paddingLeft: 4 },
   memberAddBtn: { borderRadius: 14, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 5 },
   memberAddText: { fontSize: 12, fontWeight: "700" },
+  memberNudgeBtn: { borderRadius: 14, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5 },
+  memberNudgeText: { fontSize: 12, fontWeight: "600" },
   memberControls: { flexDirection: "row", flexWrap: "wrap", gap: 8, padding: 12 },
   memberCtrlBtn: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 6 },
   memberCtrlText: { fontSize: 12, fontWeight: "600" },
@@ -419,8 +596,15 @@ const styles = StyleSheet.create({
   summaryCard: { flex: 1, borderRadius: 16, padding: 18, borderWidth: 1 },
   summaryLabel: { fontSize: 13 },
   summaryValue: { fontSize: 24, fontWeight: "700", marginTop: 6 },
-  addBtn: { padding: 16, borderRadius: 14, alignItems: "center", marginBottom: 28 },
-  addBtnText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
+
+  // Quick-action row (Add Debt / Nudge)
+  actionRow: { flexDirection: "row", gap: 10, marginBottom: 28 },
+  actionBtnPrimary: { flex: 1, borderRadius: 14, overflow: "hidden" },
+  actionBtnGrad: { height: 46, alignItems: "center", justifyContent: "center", borderRadius: 14 },
+  actionBtnPrimText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+  actionBtnSecondary: { flex: 1, height: 46, borderRadius: 14, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  actionBtnSecText: { fontSize: 15, fontWeight: "600" },
+
   section: { marginBottom: 28 },
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
   sectionTitle: { fontSize: 18, fontWeight: "700" },

@@ -26,7 +26,7 @@ export default function LoginScreen() {
   const { signIn } = useAuth();
   const { colors: t } = useTheme();
 
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,10 +34,10 @@ export default function LoginScreen() {
 
   async function handleLogin() {
     setError(null);
-    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedIdentifier = identifier.trim();
 
-    if (!trimmedEmail) {
-      setError("Please enter your email address.");
+    if (!trimmedIdentifier) {
+      setError("Please enter your username, email, or phone number.");
       return;
     }
     if (!password) {
@@ -46,7 +46,7 @@ export default function LoginScreen() {
     }
 
     setLoading(true);
-    const err = await signIn(trimmedEmail, password);
+    const err = await signIn(trimmedIdentifier, password);
     setLoading(false);
 
     if (err) {
@@ -79,21 +79,21 @@ export default function LoginScreen() {
 
         {/* Form card */}
         <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
-          {/* Email */}
+          {/* Identifier */}
           <View style={styles.field}>
-            <Text style={[styles.label, { color: t.textSub }]}>Email</Text>
+            <Text style={[styles.label, { color: t.textSub }]}>Username, email, or phone number</Text>
             <View style={[styles.inputWrapper, { backgroundColor: t.input, borderColor: t.border }]}>
-              <Ionicons name="mail-outline" size={18} color={t.textMuted} style={styles.inputIconLeft} />
+              <Ionicons name="person-outline" size={18} color={t.textMuted} style={styles.inputIconLeft} />
               <TextInput
                 style={[styles.input, { color: t.text }]}
-                placeholder="you@example.com"
+                placeholder="yourhandle, you@email.com, or +1 555…"
                 placeholderTextColor={t.textMuted}
-                value={email}
-                onChangeText={setEmail}
+                value={identifier}
+                onChangeText={setIdentifier}
                 autoCapitalize="none"
                 autoCorrect={false}
-                keyboardType="email-address"
-                textContentType="emailAddress"
+                keyboardType="default"
+                textContentType="username"
                 returnKeyType="next"
                 inputAccessoryViewID={ACCESSORY_ID}
               />

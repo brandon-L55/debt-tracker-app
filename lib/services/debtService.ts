@@ -402,6 +402,31 @@ export async function createDebt(input: CreateDebtInput): Promise<Debt> {
       });
   }
 
+  // Create a pending friend request if these users are not already friends.
+  // Fire-and-forget: non-critical — debt was already saved successfully.
+  if (linkedUserId && user.id !== linkedUserId) {
+    (async () => {
+      const { data: existing } = await supabase
+        .from("friend_requests")
+        .select("id")
+        .or(
+          `and(sender_user_id.eq.${user.id},recipient_user_id.eq.${linkedUserId}),` +
+          `and(sender_user_id.eq.${linkedUserId},recipient_user_id.eq.${user.id})`
+        )
+        .maybeSingle();
+      if (!existing) {
+        const { error: frErr } = await supabase.from("friend_requests").insert({
+          sender_user_id: user.id,
+          recipient_user_id: linkedUserId,
+          status: "pending",
+        });
+        if (frErr && (frErr as { code?: string }).code !== "23505") {
+          console.warn("[WARN] friend request insert:", frErr.message);
+        }
+      }
+    })();
+  }
+
   const debt = rowToDebt(data as DebtRow, user.id);
   await fillMissingPersonNames([debt]);
   const { _otherUserId: _omit, ...result } = debt;
@@ -422,6 +447,8 @@ export async function createManyDebts(
 
 /**
  * Update the status of a debt (e.g. pending → paid).
+ * When accepting a debt, also accepts the matching pending friend request
+ * from the debt creator → current user (if one exists).
  */
 export async function updateDebtStatus(
   id: string,
@@ -432,6 +459,35 @@ export async function updateDebtStatus(
     .update({ status })
     .eq("id", id);
   if (error) throw new Error(error.message);
+
+  if (status === "accepted") {
+    // Accept the friend request that was auto-created when the debt was sent.
+    // Fire-and-forget: non-critical — the debt status was already updated.
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+      const uid = session.user.id;
+
+      const { data: debtRow } = await supabase
+        .from("debts")
+        .select("creator_id")
+        .eq("id", id)
+        .single();
+      if (!debtRow) return;
+
+      const creatorId = (debtRow as { creator_id: string }).creator_id;
+      if (creatorId === uid) return;
+
+      // Accept pending request from debt creator → current user
+      const { error: frErr } = await supabase
+        .from("friend_requests")
+        .update({ status: "accepted" })
+        .eq("sender_user_id", creatorId)
+        .eq("recipient_user_id", uid)
+        .eq("status", "pending");
+      if (frErr) console.warn("[WARN] friend request accept on debt:", frErr.message);
+    })();
+  }
 }
 
 export async function updateDebtDetails(

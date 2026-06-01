@@ -4,6 +4,7 @@ import { useDebts } from "@/context/DebtContext";
 import { useContacts } from "@/context/ContactsContext";
 import { useTheme } from "@/context/ThemeContext";
 import { getPendingInvitesForEmails } from "@/lib/services/contactsService";
+import { hasPendingDebtTo } from "@/lib/services/friendRequestsService";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState, useMemo } from "react";
 import type { Individual } from "@/context/DebtContext";
@@ -65,10 +66,11 @@ function isEmail(input: string): boolean {
 }
 
 type SelectedPerson = {
-  name: string;        // canonical name: used for debt.person (must match individual.name)
-  displayName: string; // chip label: nickname || name
-  contactId?: string;  // when selected from contacts; skips resolvePersonForDebt
-  isLinked?: boolean;  // true when the contact has a real app account (linked_user_id set)
+  name: string;          // canonical name: used for debt.person (must match individual.name)
+  displayName: string;   // chip label: nickname || name
+  contactId?: string;    // when selected from contacts; skips resolvePersonForDebt
+  isLinked?: boolean;    // true when the contact has a real app account (linked_user_id set)
+  linkedUserId?: string; // the linked user's auth id, used for friend-request checks
 };
 
 export default function AddDebtScreen() {
@@ -103,7 +105,7 @@ export default function AddDebtScreen() {
     const ind = individuals.find(i => i.id === prefillContactId);
     if (!ind) return;
     prefillApplied.current = true;
-    setPeople([{ name: ind.name, displayName: ind.nickname || ind.name, contactId: ind.id, isLinked: !!ind.linkedUserId }]);
+    setPeople([{ name: ind.name, displayName: ind.nickname || ind.name, contactId: ind.id, isLinked: !!ind.linkedUserId, linkedUserId: ind.linkedUserId }]);
   }, [prefillContactId, individuals]);
 
   const suggestions = useMemo<Individual[]>(() => {
@@ -140,7 +142,7 @@ export default function AddDebtScreen() {
       setPersonInput("");
       return;
     }
-    setPeople(prev => [...prev, { name: ind.name, displayName, contactId: ind.id, isLinked: !!ind.linkedUserId }]);
+    setPeople(prev => [...prev, { name: ind.name, displayName, contactId: ind.id, isLinked: !!ind.linkedUserId, linkedUserId: ind.linkedUserId }]);
     setPersonInput("");
   }
 
@@ -214,6 +216,22 @@ export default function AddDebtScreen() {
         createDebtRequestId(),
       );
     }
+    // Block duplicate pending debt to the same unadded linked user.
+    for (const sp of effectivePeople) {
+      if (sp.isLinked && sp.linkedUserId) {
+        const blocked = await hasPendingDebtTo(sp.linkedUserId);
+        if (blocked) {
+          Alert.alert(
+            "Request already pending",
+            `You already have a pending debt request with ${sp.displayName}. Wait until they respond or add you back before sending another.`
+          );
+          saveInFlightRef.current = false;
+          setIsSaving(false);
+          return;
+        }
+      }
+    }
+
     try {
       for (let i = 0; i < effectivePeople.length; i += 1) {
         const sp = effectivePeople[i];

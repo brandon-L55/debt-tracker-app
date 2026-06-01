@@ -71,6 +71,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         cashapp_handle: row.cashapp_handle ?? "",
         paypal_handle: row.paypal_handle ?? "",
       };
+      console.log("[ProfileContext] loaded avatar_url from Supabase:", data.avatar_url);
       setProfile(data);
       AsyncStorage.setItem(CACHE_KEY, JSON.stringify(data));
     }
@@ -85,6 +86,8 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     const next = { ...profile, ...patch };
     setProfile(next); // optimistic
 
+    console.log("[ProfileContext] updateProfile avatar_url:", next.avatar_url);
+
     const err = await upsertProfile(session.user.id, {
       display_name: next.display_name || null,
       phone: next.phone || null,
@@ -96,10 +99,12 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     });
 
     if (err) {
+      console.error("[ProfileContext] upsertProfile failed:", err);
       setProfile(previous); // revert
       return err;
     }
 
+    console.log("[ProfileContext] upsertProfile succeeded, caching avatar_url:", next.avatar_url);
     AsyncStorage.setItem(CACHE_KEY, JSON.stringify(next));
     return null;
   }

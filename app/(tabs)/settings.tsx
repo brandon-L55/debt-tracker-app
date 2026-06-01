@@ -9,6 +9,7 @@ import { ACCENTS } from "@/constants/theme";
 import {
   User, Wallet, BookOpen, Shield, LogOut, ChevronRight, Sun, Moon,
 } from "lucide-react-native";
+import { GotchuLatrLogo } from "@/components/GotchuLatrLogo";
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -48,6 +49,10 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: t.bg }} contentContainerStyle={styles.content}>
+      <View style={styles.brandRow}>
+        <GotchuLatrLogo size={36} />
+        <Text style={[styles.brandName, { color: t.text }]}>GotchuLatr</Text>
+      </View>
       <Text style={[styles.title, { color: t.text }]}>Settings</Text>
 
       {/* APP PREFERENCES */}
@@ -178,7 +183,9 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   content: { padding: 24, paddingBottom: 48 },
-  title: { fontSize: 30, fontWeight: "700", letterSpacing: -0.8, marginTop: 60, marginBottom: 28 },
+  brandRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 60, marginBottom: 4 },
+  brandName: { fontSize: 20, fontWeight: "800", letterSpacing: -0.5 },
+  title: { fontSize: 30, fontWeight: "700", letterSpacing: -0.8, marginTop: 12, marginBottom: 28 },
 
   sectionLabel: {
     fontSize: 11, fontWeight: "700", letterSpacing: 1.2,

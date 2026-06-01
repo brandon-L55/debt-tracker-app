@@ -5,6 +5,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 // @ts-ignore — forwardRef deprecation hint from React 19; library still works correctly
 import DraggableFlatList, { ScaleDecorator } from "react-native-draggable-flatlist";
 import type { RenderItemParams } from "react-native-draggable-flatlist";
+import { Bell, BellOff, Pin, PinOff, Trash2 } from "lucide-react-native";
 import { useDebts } from "@/context/DebtContext";
 import { useGroups } from "@/context/GroupsContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -43,17 +44,18 @@ export default function GroupsScreen() {
   const [sort, setSort] = useState<SortOption>("latest-debt");
   const [showSortMenu, setShowSortMenu] = useState(false);
 
-  const swipeableRefs = useRef<Map<string, { current: any }>>(new Map());
+  // Maps item id → live swipeable instance (set via callback ref)
+  const swipeableRefs = useRef<Map<string, any>>(new Map());
   const openIdRef = useRef<string | null>(null);
+
+  function closeAll() {
+    swipeableRefs.current.forEach(inst => inst?.close?.());
+    openIdRef.current = null;
+  }
 
   useFocusEffect(
     useCallback(() => {
-      return () => {
-        if (openIdRef.current) {
-          swipeableRefs.current.get(openIdRef.current)?.current?.close();
-          openIdRef.current = null;
-        }
-      };
+      return () => closeAll();
     }, [])
   );
 
@@ -117,19 +119,27 @@ export default function GroupsScreen() {
     const totalColor = total > 0 ? t.green : total < 0 ? t.red : t.textMuted;
 
     function renderRightActions() {
+      function closeThis() {
+        swipeableRefs.current.get(item.id)?.close?.();
+        if (openIdRef.current === item.id) openIdRef.current = null;
+      }
       return (
         <View style={styles.swipeActions}>
           <Pressable
             style={[styles.swipeAction, { backgroundColor: t.elevatedCard }]}
-            onPress={() => updateGroup(item.id, { silenced: !item.silenced })}
+            onPress={() => { updateGroup(item.id, { silenced: !item.silenced }); closeThis(); }}
           >
-            <Text style={styles.swipeActionIcon}>{item.silenced ? "🔔" : "🔕"}</Text>
+            {item.silenced
+              ? <Bell size={22} color={t.text} />
+              : <BellOff size={22} color={t.text} />}
           </Pressable>
           <Pressable
             style={[styles.swipeAction, { backgroundColor: t.primarySoft }]}
-            onPress={() => updateGroup(item.id, { pinned: !item.pinned })}
+            onPress={() => { updateGroup(item.id, { pinned: !item.pinned }); closeThis(); }}
           >
-            <Text style={styles.swipeActionIcon}>{item.pinned ? "📌" : "📍"}</Text>
+            {item.pinned
+              ? <PinOff size={22} color={t.primary} />
+              : <Pin size={22} color={t.primary} />}
           </Pressable>
           <Pressable
             style={[styles.swipeAction, { backgroundColor: t.redSoft }]}
@@ -144,16 +154,11 @@ export default function GroupsScreen() {
               )
             }
           >
-            <Text style={styles.swipeActionIcon}>🗑️</Text>
+            <Trash2 size={22} color={t.red} />
           </Pressable>
         </View>
       );
     }
-
-    if (!swipeableRefs.current.has(item.id)) {
-      swipeableRefs.current.set(item.id, { current: null });
-    }
-    const itemRef = swipeableRefs.current.get(item.id)!;
 
     return (
       <ScaleDecorator activeScale={1.02}>
@@ -162,10 +167,17 @@ export default function GroupsScreen() {
           rightThreshold={30}
           overshootRight={false}
           renderRightActions={renderRightActions}
-          ref={itemRef}
-          onSwipeableOpen={() => {
+          ref={((inst: any) => {
+            if (inst) {
+              swipeableRefs.current.set(item.id, inst);
+            } else {
+              swipeableRefs.current.delete(item.id);
+              if (openIdRef.current === item.id) openIdRef.current = null;
+            }
+          }) as any}
+          onSwipeableWillOpen={() => {
             if (openIdRef.current && openIdRef.current !== item.id) {
-              swipeableRefs.current.get(openIdRef.current)?.current?.close();
+              swipeableRefs.current.get(openIdRef.current)?.close?.();
             }
             openIdRef.current = item.id;
           }}
@@ -342,7 +354,6 @@ const styles = StyleSheet.create({
   cardBadge: { fontSize: 12 },
   swipeActions: { flexDirection: "row" },
   swipeAction: { width: 54, justifyContent: "center", alignItems: "center" },
-  swipeActionIcon: { fontSize: 20 },
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },
   menu: { borderRadius: 22, paddingVertical: 8, width: 280, shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 24, elevation: 10 },
   menuTitle: { fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 1, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },

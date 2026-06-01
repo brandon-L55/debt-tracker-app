@@ -11,9 +11,12 @@ import {
 } from "react-native";
 import { useState } from "react";
 import { useRouter } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { DoneBar } from "@/components/DoneBar";
+import { GotchuLatrLogo } from "@/components/GotchuLatrLogo";
 
 const ACCESSORY_ID = "auth-signup";
 
@@ -25,6 +28,8 @@ export default function SignupScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -65,7 +70,7 @@ export default function SignupScreen() {
     return (
       <View style={[styles.centerContainer, { backgroundColor: t.bg }]}>
         <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
-          <Text style={[styles.successIcon]}>✅</Text>
+          <Text style={styles.successIcon}>✅</Text>
           <Text style={[styles.successTitle, { color: t.text }]}>Check your email</Text>
           <Text style={[styles.successBody, { color: t.textSub }]}>
             We've sent a confirmation link to{"\n"}
@@ -73,10 +78,16 @@ export default function SignupScreen() {
             {"\n\n"}Click the link to activate your account, then sign in.
           </Text>
           <Pressable
-            style={[styles.button, { backgroundColor: t.primary }]}
             onPress={() => router.replace("/auth/login")}
           >
-            <Text style={styles.buttonText}>Back to Sign In</Text>
+            <LinearGradient
+              colors={[t.from, t.mid, t.to]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.gradientBtn}
+            >
+              <Text style={styles.buttonText}>Back to Sign In</Text>
+            </LinearGradient>
           </Pressable>
         </View>
       </View>
@@ -93,61 +104,99 @@ export default function SignupScreen() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
       >
+        {/* Logo */}
+        <View style={styles.logoWrap}>
+          <GotchuLatrLogo size={80} />
+        </View>
+
+        {/* Heading */}
         <Text style={[styles.title, { color: t.text }]}>Create account</Text>
         <Text style={[styles.subtitle, { color: t.textSub }]}>
-          Start tracking debts for free
+          Start tracking debts in seconds.
         </Text>
 
+        {/* Form card */}
         <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
           {/* Email */}
           <View style={styles.field}>
             <Text style={[styles.label, { color: t.textSub }]}>Email</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
-              placeholder="you@example.com"
-              placeholderTextColor={t.textMuted}
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              textContentType="emailAddress"
-              returnKeyType="next"
-              inputAccessoryViewID={ACCESSORY_ID}
-            />
+            <View style={[styles.inputWrapper, { backgroundColor: t.input, borderColor: t.border }]}>
+              <Ionicons name="mail-outline" size={18} color={t.textMuted} style={styles.inputIconLeft} />
+              <TextInput
+                style={[styles.input, { color: t.text }]}
+                placeholder="you@example.com"
+                placeholderTextColor={t.textMuted}
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                textContentType="emailAddress"
+                returnKeyType="next"
+                inputAccessoryViewID={ACCESSORY_ID}
+              />
+            </View>
           </View>
 
           {/* Password */}
           <View style={styles.field}>
             <Text style={[styles.label, { color: t.textSub }]}>Password</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
-              placeholder="Min. 6 characters"
-              placeholderTextColor={t.textMuted}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              textContentType="newPassword"
-              returnKeyType="next"
-              inputAccessoryViewID={ACCESSORY_ID}
-            />
+            <View style={[styles.inputWrapper, { backgroundColor: t.input, borderColor: t.border }]}>
+              <Ionicons name="lock-closed-outline" size={18} color={t.textMuted} style={styles.inputIconLeft} />
+              <TextInput
+                style={[styles.input, { color: t.text }]}
+                placeholder="Min. 6 characters"
+                placeholderTextColor={t.textMuted}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                textContentType="newPassword"
+                returnKeyType="next"
+                inputAccessoryViewID={ACCESSORY_ID}
+              />
+              <Pressable
+                onPress={() => setShowPassword(v => !v)}
+                hitSlop={10}
+                style={styles.eyeBtn}
+              >
+                <Ionicons
+                  name={showPassword ? "eye-off-outline" : "eye-outline"}
+                  size={20}
+                  color={t.textMuted}
+                />
+              </Pressable>
+            </View>
           </View>
 
           {/* Confirm Password */}
           <View style={styles.field}>
-            <Text style={[styles.label, { color: t.textSub }]}>Confirm Password</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
-              placeholder="••••••••"
-              placeholderTextColor={t.textMuted}
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry
-              textContentType="newPassword"
-              returnKeyType="go"
-              inputAccessoryViewID={ACCESSORY_ID}
-              onSubmitEditing={handleSignup}
-            />
+            <Text style={[styles.label, { color: t.textSub }]}>Confirm password</Text>
+            <View style={[styles.inputWrapper, { backgroundColor: t.input, borderColor: t.border }]}>
+              <Ionicons name="lock-closed-outline" size={18} color={t.textMuted} style={styles.inputIconLeft} />
+              <TextInput
+                style={[styles.input, { color: t.text }]}
+                placeholder="••••••••"
+                placeholderTextColor={t.textMuted}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry={!showConfirm}
+                textContentType="newPassword"
+                returnKeyType="go"
+                inputAccessoryViewID={ACCESSORY_ID}
+                onSubmitEditing={handleSignup}
+              />
+              <Pressable
+                onPress={() => setShowConfirm(v => !v)}
+                hitSlop={10}
+                style={styles.eyeBtn}
+              >
+                <Ionicons
+                  name={showConfirm ? "eye-off-outline" : "eye-outline"}
+                  size={20}
+                  color={t.textMuted}
+                />
+              </Pressable>
+            </View>
           </View>
 
           {/* Error */}
@@ -159,15 +208,39 @@ export default function SignupScreen() {
 
           {/* Submit */}
           <Pressable
-            style={[styles.button, { backgroundColor: t.primary }, loading && styles.buttonDisabled]}
             onPress={handleSignup}
             disabled={loading}
+            style={loading ? { opacity: 0.6 } : undefined}
           >
-            {loading ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Text style={styles.buttonText}>Create Account</Text>
-            )}
+            <LinearGradient
+              colors={[t.from, t.mid, t.to]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.gradientBtn}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.buttonText}>Create account</Text>
+              )}
+            </LinearGradient>
+          </Pressable>
+        </View>
+
+        {/* Divider */}
+        <View style={styles.dividerRow}>
+          <View style={[styles.dividerLine, { backgroundColor: t.border }]} />
+          <Text style={[styles.dividerLabel, { color: t.textMuted }]}>OR CONTINUE WITH</Text>
+          <View style={[styles.dividerLine, { backgroundColor: t.border }]} />
+        </View>
+
+        {/* Social buttons */}
+        <View style={styles.socialRow}>
+          <Pressable style={[styles.socialBtn, { backgroundColor: t.card, borderColor: t.border }]}>
+            <Text style={[styles.socialText, { color: t.text }]}>Apple</Text>
+          </Pressable>
+          <Pressable style={[styles.socialBtn, { backgroundColor: t.card, borderColor: t.border }]}>
+            <Text style={[styles.socialText, { color: t.text }]}>Google</Text>
           </Pressable>
         </View>
 
@@ -177,7 +250,7 @@ export default function SignupScreen() {
             Already have an account?{" "}
           </Text>
           <Pressable onPress={() => router.push("/auth/login")}>
-            <Text style={[styles.footerLink, { color: t.primary }]}>Sign In</Text>
+            <Text style={[styles.footerLink, { color: t.primary }]}>Sign in</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -189,29 +262,42 @@ export default function SignupScreen() {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
+    alignItems: "center",
     justifyContent: "center",
-    padding: 24,
-    paddingBottom: 48,
+    paddingHorizontal: 24,
+    paddingVertical: 48,
   },
   centerContainer: {
     flex: 1,
     justifyContent: "center",
     padding: 24,
   },
+  logoWrap: {
+    marginBottom: 24,
+  },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: "700",
+    textAlign: "center",
     marginBottom: 6,
   },
   subtitle: {
-    fontSize: 16,
-    marginBottom: 32,
+    fontSize: 15,
+    textAlign: "center",
+    marginBottom: 28,
   },
   card: {
-    borderRadius: 16,
+    width: "100%",
+    borderRadius: 18,
     borderWidth: 1,
     padding: 20,
     gap: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 3,
+    marginBottom: 24,
   },
   field: {
     gap: 6,
@@ -220,12 +306,26 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
   },
-  input: {
-    borderRadius: 10,
+  inputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 12,
     borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 12,
+    paddingVertical: Platform.OS === "ios" ? 13 : 10,
+    gap: 8,
+  },
+  inputIconLeft: {
+    flexShrink: 0,
+  },
+  input: {
+    flex: 1,
     fontSize: 16,
+    padding: 0,
+  },
+  eyeBtn: {
+    flexShrink: 0,
+    paddingLeft: 4,
   },
   errorBox: {
     borderRadius: 10,
@@ -235,32 +335,67 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 14,
   },
-  button: {
-    borderRadius: 12,
-    paddingVertical: 14,
+  gradientBtn: {
+    borderRadius: 14,
+    paddingVertical: 15,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 4,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
   },
   buttonText: {
     color: "#fff",
     fontSize: 16,
+    fontWeight: "700",
+  },
+  dividerRow: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 16,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+  },
+  dividerLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 0.5,
+  },
+  socialRow: {
+    width: "100%",
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 28,
+  },
+  socialBtn: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingVertical: 13,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  socialText: {
+    fontSize: 15,
     fontWeight: "600",
   },
   footer: {
     flexDirection: "row",
     justifyContent: "center",
-    marginTop: 24,
+    alignItems: "center",
   },
   footerText: {
     fontSize: 14,
   },
   footerLink: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "700",
   },
   successIcon: {
     fontSize: 48,

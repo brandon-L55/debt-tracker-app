@@ -419,6 +419,14 @@ export default function IndividualDashboardScreen() {
                       <Text style={[styles.txDueText, { color: t.textMuted }]}>Due N/A</Text>
                     )}
                   </View>
+                  {debt.status === "paid" && debt.paidAt && (
+                    <View style={styles.txDueRow}>
+                      <Text style={styles.txDueIcon}>✓</Text>
+                      <Text style={[styles.txDueText, { color: t.green }]}>
+                        {`Paid ${new Date(debt.paidAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`}
+                      </Text>
+                    </View>
+                  )}
                 </View>
                 <View style={styles.txRight}>
                   <Text style={[styles.txAmount, { color: debt.direction === "me" ? t.red : t.green }]}>

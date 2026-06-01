@@ -309,6 +309,15 @@ export default function DebtDetailScreen() {
             )}
           </View>
 
+          {debt.status === "paid" && debt.paidAt && (
+            <View style={[styles.detailRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.border }]}>
+              <Text style={[styles.detailKey, { color: t.textSub }]}>Paid</Text>
+              <Text style={[styles.detailVal, { color: t.green }]}>
+                {new Date(debt.paidAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+              </Text>
+            </View>
+          )}
+
           <View style={[styles.detailRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.border }]}>
             <Text style={[styles.detailKey, { color: t.textSub }]}>Created</Text>
             <Text style={[styles.detailVal, { color: t.text }]}>

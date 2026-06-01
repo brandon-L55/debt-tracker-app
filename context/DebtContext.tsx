@@ -33,6 +33,8 @@ export type Debt = {
   prePaidStatus?: Debt["status"];
   /** Remaining balance before manual paid — used to restore on undo. */
   prePaidRemainingAmount?: number;
+  /** ISO timestamp when this debt was fully paid (via payment or mark paid). Null if not yet paid. */
+  paidAt?: string | null;
 };
 
 // Group and GroupMember types remain here so all screens can import them
@@ -420,6 +422,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
           totalPaidAmount: d.totalPaidAmount + paymentAmount,
           totalReceivedAmount:
             d.direction === "them" ? d.totalReceivedAmount + paymentAmount : d.totalReceivedAmount,
+          paidAt: newStatus === "paid" ? new Date().toISOString() : d.paidAt,
         };
       }));
     } finally {
@@ -481,6 +484,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     const prePaidStatus = debt.status;
     const prePaidRemainingAmount = debt.remainingAmount;
 
+    const nowIso = new Date().toISOString();
     setDebts(prev => prev.map(d => d.id === debtId ? {
       ...d,
       status: "paid" as const,
@@ -489,6 +493,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       manuallyPaid: true,
       prePaidStatus,
       prePaidRemainingAmount,
+      paidAt: nowIso,
     } : d));
 
     try {
@@ -502,6 +507,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
         manuallyPaid: false,
         prePaidStatus: undefined,
         prePaidRemainingAmount: undefined,
+        paidAt: null,
       } : d));
       throw e;
     }
@@ -513,6 +519,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
 
     const restoredStatus = debt.prePaidStatus ?? "accepted";
     const restoredRemaining = debt.prePaidRemainingAmount ?? debt.amount;
+    const originalPaidAt = debt.paidAt ?? null;
 
     setDebts(prev => prev.map(d => d.id === debtId ? {
       ...d,
@@ -522,6 +529,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       manuallyPaid: false,
       prePaidStatus: undefined,
       prePaidRemainingAmount: undefined,
+      paidAt: null,
     } : d));
 
     try {
@@ -535,6 +543,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
         manuallyPaid: true,
         prePaidStatus: restoredStatus as Debt["status"],
         prePaidRemainingAmount: restoredRemaining,
+        paidAt: originalPaidAt,
       } : d));
       throw e;
     }

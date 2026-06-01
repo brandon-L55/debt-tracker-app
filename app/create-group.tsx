@@ -89,12 +89,37 @@ export default function CreateGroupScreen() {
       Alert.alert("Missing field", "Please enter a group name.");
       return;
     }
+
+    // Auto-add any valid person left in the member input fields.
+    let finalMembers = members;
+    if (memberName.trim()) {
+      if (!memberContactId && !memberContact.trim()) {
+        Alert.alert("Missing field", "Enter a phone number or username for the unsaved member, or tap + Add Member first.");
+        return;
+      }
+      const isDuplicate = memberContactId
+        ? members.some(m => m.contactId === memberContactId)
+        : members.some(m => m.name.toLowerCase() === memberName.trim().toLowerCase());
+      if (!isDuplicate) {
+        const contact = memberContactId ? individuals.find(i => i.id === memberContactId) : null;
+        finalMembers = [
+          ...members,
+          {
+            id: Math.random().toString(36).slice(2),
+            name: memberName.trim(),
+            phoneOrUsername: contact?.phoneOrUsername || memberContact.trim(),
+            contactId: memberContactId ?? undefined,
+          },
+        ];
+      }
+    }
+
     setSaving(true);
     try {
       await addGroup({
         name: groupName.trim(),
         description: description.trim(),
-        members,
+        members: finalMembers,
       });
       router.replace("/(tabs)/groups");
     } catch (e: unknown) {

@@ -24,6 +24,7 @@ type DebtRow = {
   manually_paid: boolean | null;
   pre_paid_status: string | null;
   pre_paid_remaining_cents: number | null;
+  paid_at: string | null;
 };
 
 // Internal type used while building the return value — _otherUserId is
@@ -84,6 +85,7 @@ function rowToDebt(row: DebtRow, currentUserId: string): DebtWithMeta {
     prePaidStatus: (row.pre_paid_status as Debt["status"]) ?? undefined,
     prePaidRemainingAmount:
       row.pre_paid_remaining_cents != null ? row.pre_paid_remaining_cents / 100 : undefined,
+    paidAt: row.paid_at ?? null,
     // Tag debts whose person name is missing so getDebts can batch-fill them.
     _otherUserId:
       !contactRecord && !!otherUserId && otherUserId !== currentUserId
@@ -558,6 +560,7 @@ export async function markDebtManuallyPaid(debtId: string): Promise<void> {
       manually_paid: true,
       pre_paid_status: r.status,
       pre_paid_remaining_cents: prePaidRemainingCents,
+      paid_at: new Date().toISOString(),
     })
     .eq("id", debtId);
 
@@ -595,6 +598,7 @@ export async function undoManualPaid(debtId: string): Promise<void> {
       manually_paid: false,
       pre_paid_status: null,
       pre_paid_remaining_cents: null,
+      paid_at: null,
     })
     .eq("id", debtId);
 

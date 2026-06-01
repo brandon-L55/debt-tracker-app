@@ -35,6 +35,7 @@ export default function SignupScreen() {
   const { colors: t } = useTheme();
 
   const [phone, setPhone] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -84,6 +85,7 @@ export default function SignupScreen() {
     const result = await signUp({
       phone: trimPhone,
       password,
+      displayName: displayName.trim() || undefined,
       username: trimUsername || undefined,
       email: trimEmail || undefined,
     });
@@ -192,6 +194,30 @@ export default function SignupScreen() {
                 inputAccessoryViewID={ACCESSORY_ID}
               />
             </View>
+          </View>
+
+          {/* Display Name — optional */}
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: t.textSub }]}>
+              Display name <Text style={[styles.optionalTag, { color: t.textMuted }]}>(optional)</Text>
+            </Text>
+            <View style={[styles.inputWrapper, { backgroundColor: t.input, borderColor: t.border }]}>
+              <Ionicons name="person-outline" size={18} color={t.textMuted} style={styles.inputIconLeft} />
+              <TextInput
+                style={[styles.input, { color: t.text }]}
+                placeholder="Your name"
+                placeholderTextColor={t.textMuted}
+                value={displayName}
+                onChangeText={setDisplayName}
+                autoCapitalize="words"
+                autoCorrect={false}
+                returnKeyType="next"
+                inputAccessoryViewID={ACCESSORY_ID}
+              />
+            </View>
+            <Text style={[styles.hint, { color: t.textMuted }]}>
+              This is what others see when they find you
+            </Text>
           </View>
 
           {/* Username — optional */}

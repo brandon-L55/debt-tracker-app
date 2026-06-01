@@ -11,6 +11,8 @@ export type SignUpOptions = {
   /** Required. Stored normalized in profiles.phone. */
   phone: string;
   password: string;
+  /** Optional. The name other users see. Not unique. */
+  displayName?: string;
   /** Optional. Stored lowercased in profiles.username. Must be unique if set. */
   username?: string;
   /** Optional. Used as the Supabase auth email. Must be unique if set. */
@@ -168,7 +170,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Save profile fields immediately.
     if (authData.user) {
+      const normalizedDisplayName = opts.displayName?.trim() || null;
       const patch: Record<string, unknown> = { id: authData.user.id, phone: normalizedPhone };
+      if (normalizedDisplayName) patch.display_name = normalizedDisplayName;
       if (normalizedUsername) patch.username = normalizedUsername;
       if (normalizedEmail) patch.email = normalizedEmail;
 

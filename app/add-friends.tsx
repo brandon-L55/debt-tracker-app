@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "@/context/ThemeContext";
+import { useAuth } from "@/context/AuthContext";
 import { useContacts } from "@/context/ContactsContext";
+import { supabase } from "@/lib/supabase";
 import { Avatar } from "@/components/Avatar";
 import {
   getIncomingFriendRequests,
@@ -75,6 +77,7 @@ function EmptyState({ title, subtitle }: { title: string; subtitle: string }) {
 
 export default function AddFriendsScreen() {
   const { colors: t } = useTheme();
+  const { session } = useAuth();
   const { addLinkedIndividual, addCachedIndividuals } = useContacts();
 
   const [incoming, setIncoming] = useState<FriendRequest[]>([]);
@@ -125,6 +128,29 @@ export default function AddFriendsScreen() {
 
   useEffect(() => { loadIncoming(); }, [loadIncoming]);
   useEffect(() => { loadOutgoing(); }, [loadOutgoing]);
+
+  // Realtime: reload relevant list whenever a friend_request row changes.
+  useEffect(() => {
+    if (!session) return;
+
+    const uid = session.user.id;
+    const channel = supabase
+      .channel(`friend-requests-sync:${uid}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "friend_requests", filter: `recipient_user_id=eq.${uid}` },
+        () => { loadIncoming(); },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "friend_requests", filter: `sender_user_id=eq.${uid}` },
+        () => { loadOutgoing(); },
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user.id]);
 
   function setActing(id: string, active: boolean) {
     setActingIds(prev => {

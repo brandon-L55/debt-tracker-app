@@ -5,6 +5,7 @@ import { useDebts } from "./DebtContext";
 import { useContacts } from "./ContactsContext";
 import type { Group } from "./DebtContext";
 import * as groupService from "@/lib/services/groupService";
+import { supabase } from "@/lib/supabase";
 
 type GroupsContextType = {
   groups: Group[];
@@ -51,6 +52,30 @@ export function GroupsProvider({ children }: { children: ReactNode }) {
     loadGroups();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user.id, authLoading]);
+
+  // Realtime: reload groups whenever a group the user owns or a group_members
+  // row for this user changes (insert/update/delete).
+  useEffect(() => {
+    if (!session) return;
+
+    const uid = session.user.id;
+    const channel = supabase
+      .channel(`groups-sync:${uid}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "groups", filter: `owner_id=eq.${uid}` },
+        () => { loadGroups(); },
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "group_members", filter: `user_id=eq.${uid}` },
+        () => { loadGroups(); },
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user.id]);
 
   async function loadGroups() {
     setIsLoading(true);

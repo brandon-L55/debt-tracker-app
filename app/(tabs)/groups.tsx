@@ -145,11 +145,19 @@ export default function GroupsScreen() {
             style={[styles.swipeAction, { backgroundColor: t.redSoft }]}
             onPress={() =>
               Alert.alert(
-                "Delete Group",
-                `Are you sure you want to delete ${item.name}?`,
+                "Delete this group?",
+                `All debts in ${item.name} will be kept as individual debts between the people involved. The group itself will be removed.`,
                 [
                   { text: "Cancel", style: "cancel" },
-                  { text: "Delete", style: "destructive", onPress: () => deleteGroup(item.id) },
+                  {
+                    text: "Delete Group",
+                    style: "destructive",
+                    onPress: () => {
+                      deleteGroup(item.id).catch(e =>
+                        Alert.alert("Error", e instanceof Error ? e.message : "Could not delete group.")
+                      );
+                    },
+                  },
                 ]
               )
             }

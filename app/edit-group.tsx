@@ -29,7 +29,7 @@ function uid() {
 export default function EditGroupScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { groups, updateGroup } = useGroups();
+  const { groups, updateGroup, removeMemberFromGroup } = useGroups();
   const { colors: t, isDark } = useTheme();
 
   const resolvedId = Array.isArray(id) ? id[0] : id;
@@ -42,6 +42,7 @@ export default function EditGroupScreen() {
 
   const [memberName, setMemberName] = useState("");
   const [memberContact, setMemberContact] = useState("");
+  const [removing, setRemoving] = useState(false);
 
   if (!group) {
     return (
@@ -82,7 +83,34 @@ export default function EditGroupScreen() {
   }
 
   function handleRemoveMember(memberId: string) {
-    setMembers(prev => prev.filter(m => m.id !== memberId));
+    const member = members.find(m => m.id === memberId);
+    if (!member) return;
+    Alert.alert(
+      `Remove ${member.name}?`,
+      `Any group debts involving ${member.name} will be kept as individual debts between the people involved. They will no longer count toward this group's balance.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: async () => {
+            setRemoving(true);
+            // Optimistic local update.
+            setMembers(prev => prev.filter(m => m.id !== memberId));
+            try {
+              await removeMemberFromGroup(resolvedId, memberId);
+            } catch (e: unknown) {
+              // Rollback local state and surface error.
+              setMembers(prev => [...prev, member]);
+              const msg = e instanceof Error ? e.message : "Could not remove member.";
+              Alert.alert("Error", msg);
+            } finally {
+              setRemoving(false);
+            }
+          },
+        },
+      ]
+    );
   }
 
   function handleSave() {
@@ -158,8 +186,8 @@ export default function EditGroupScreen() {
               <Text style={[styles.memberName, { color: t.text }]}>{m.name}</Text>
               <Text style={[styles.memberContact, { color: t.textSub }]}>{m.phoneOrUsername}</Text>
             </View>
-            <Pressable onPress={() => handleRemoveMember(m.id)}>
-              <Text style={[styles.removeText, { color: t.red }]}>Remove</Text>
+            <Pressable onPress={() => handleRemoveMember(m.id)} disabled={removing}>
+              <Text style={[styles.removeText, { color: t.red, opacity: removing ? 0.4 : 1 }]}>Remove</Text>
             </Pressable>
           </View>
         ))}

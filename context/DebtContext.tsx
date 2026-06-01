@@ -96,6 +96,8 @@ type DebtContextType = {
   markDebtManuallyPaid: (debtId: string) => Promise<void>;
   /** Reverts a manual-paid debt back to its previous state. */
   undoManualPaid: (debtId: string) => Promise<void>;
+  /** Clears groupId on the given debt IDs. Called when a group member is removed so their debts drop off the group view immediately. */
+  ungroupDebts: (debtIds: string[]) => void;
   reset: () => void;
   isLoading: boolean;
 };
@@ -553,6 +555,11 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     setDebts([]);
   }
 
+  function ungroupDebts(debtIds: string[]) {
+    const idSet = new Set(debtIds);
+    setDebts(prev => prev.map(d => idSet.has(d.id) ? { ...d, groupId: undefined } : d));
+  }
+
   return (
     <DebtContext.Provider value={{
       debts, currentUserId, addDebt, updateDebtStatus, updateDebtDetails, cancelDebt, addPayment,
@@ -561,6 +568,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       applyPartialPayment,
       markDebtManuallyPaid,
       undoManualPaid,
+      ungroupDebts,
       reset,
       isLoading,
     }}>

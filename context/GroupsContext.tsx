@@ -12,8 +12,10 @@ type GroupsContextType = {
   addGroup: (group: Omit<Group, "id" | "createdAt">) => Promise<void>;
   /** Optimistic: local state updates immediately; Supabase syncs in background. */
   updateGroup: (id: string, updates: Partial<Omit<Group, "id" | "createdAt">>) => void;
-  /** Optimistic: local state updates immediately; Supabase syncs in background. */
-  deleteGroup: (id: string) => void;
+  /** Converts all debts in the group to individual debts, then deletes the group. */
+  deleteGroup: (id: string) => Promise<void>;
+  /** Removes a member from a group and converts their group debts to individual debts. */
+  removeMemberFromGroup: (groupId: string, memberId: string) => Promise<void>;
   groupOrder: string[];
   /** Optimistic: local order updates immediately; Supabase syncs in background. */
   setGroupOrder: (order: string[]) => void;
@@ -25,7 +27,7 @@ const GroupsContext = createContext<GroupsContextType | null>(null);
 
 export function GroupsProvider({ children }: { children: ReactNode }) {
   const { session, isLoading: authLoading } = useAuth();
-  const { renameDebtPerson } = useDebts();
+  const { renameDebtPerson, ungroupDebts } = useDebts();
   // addCachedIndividuals surfaces auto-created contacts in the Individuals tab immediately.
   // Requires ContactsProvider to wrap GroupsProvider in the component tree.
   const { addCachedIndividuals } = useContacts();
@@ -97,12 +99,37 @@ export function GroupsProvider({ children }: { children: ReactNode }) {
     );
   }
 
-  function deleteGroup(id: string) {
+  async function deleteGroup(id: string): Promise<void> {
+    // Optimistic: remove group from local state immediately.
+    const originalGroups = groups;
+    const originalOrder = groupOrder;
     setGroups(prev => prev.filter(g => g.id !== id));
     setGroupOrderState(prev => prev.filter(oid => oid !== id));
-    groupService.deleteGroup(id).catch(e =>
-      console.error("Failed to delete group:", e)
-    );
+    try {
+      const ungroupedIds = await groupService.deleteGroup(id);
+      ungroupDebts(ungroupedIds);
+    } catch (e) {
+      setGroups(originalGroups);
+      setGroupOrderState(originalOrder);
+      throw e;
+    }
+  }
+
+  async function removeMemberFromGroup(groupId: string, memberId: string): Promise<void> {
+    const originalGroups = groups;
+    // Optimistic: remove the member from local groups state immediately.
+    setGroups(prev => prev.map(g =>
+      g.id === groupId ? { ...g, members: g.members.filter(m => m.id !== memberId) } : g
+    ));
+    try {
+      const ungroupedIds = await groupService.removeMemberFromGroup(groupId, memberId);
+      // Clear groupId on affected debts so they drop off the group view immediately.
+      ungroupDebts(ungroupedIds);
+    } catch (e) {
+      // Rollback on failure.
+      setGroups(originalGroups);
+      throw e;
+    }
   }
 
   function setGroupOrder(order: string[]) {
@@ -118,6 +145,7 @@ export function GroupsProvider({ children }: { children: ReactNode }) {
       addGroup,
       updateGroup,
       deleteGroup,
+      removeMemberFromGroup,
       groupOrder,
       setGroupOrder,
       isLoading,

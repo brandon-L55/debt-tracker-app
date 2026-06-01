@@ -227,11 +227,93 @@ export async function updateGroup(
 }
 
 /**
- * Delete a group by id. group_members are cascade-deleted by the DB.
+ * Remove a single member from a group.
+ * Debts in this group involving the removed member have their group_id set to null
+ * (converting them to individual debts). The group_members row is then deleted.
+ * Returns the IDs of debts that were ungrouped.
  */
-export async function deleteGroup(id: string): Promise<void> {
+export async function removeMemberFromGroup(
+  groupId: string,
+  groupMemberId: string,
+): Promise<string[]> {
+  // Fetch the member row to know their contact_id and user_id.
+  const { data: memberRow, error: fetchError } = await supabase
+    .from("group_members")
+    .select("contact_id, user_id")
+    .eq("id", groupMemberId)
+    .single();
+  if (fetchError) throw new Error(fetchError.message);
+
+  const { contact_id, user_id } = memberRow as { contact_id: string | null; user_id: string | null };
+
+  let ungroupedIds: string[] = [];
+
+  if (contact_id || user_id) {
+    const filters: string[] = [];
+    if (contact_id) {
+      filters.push(`payer_contact_id.eq.${contact_id}`);
+      filters.push(`borrower_contact_id.eq.${contact_id}`);
+    }
+    if (user_id) {
+      filters.push(`payer_user_id.eq.${user_id}`);
+      filters.push(`borrower_user_id.eq.${user_id}`);
+    }
+
+    // Find which debts in this group involve the removed member.
+    const { data: matchedDebts } = await supabase
+      .from("debts")
+      .select("id")
+      .eq("group_id", groupId)
+      .or(filters.join(","));
+    ungroupedIds = ((matchedDebts ?? []) as { id: string }[]).map(d => d.id);
+
+    if (ungroupedIds.length > 0) {
+      const { error: updateError } = await supabase
+        .from("debts")
+        .update({ group_id: null })
+        .in("id", ungroupedIds);
+      if (updateError) throw new Error(updateError.message);
+    }
+  }
+
+  // Delete the group_members row.
+  const { error: deleteError } = await supabase
+    .from("group_members")
+    .delete()
+    .eq("id", groupMemberId);
+  if (deleteError) throw new Error(deleteError.message);
+
+  return ungroupedIds;
+}
+
+/**
+ * Delete a group by id.
+ * Before deleting, all debts in the group have their group_id set to null
+ * so they are preserved as individual debts. group_members are cascade-deleted by the DB.
+ * Returns the IDs of debts that were ungrouped.
+ */
+export async function deleteGroup(id: string): Promise<string[]> {
+  // 1. Find all debts in this group.
+  const { data: groupDebts } = await supabase
+    .from("debts")
+    .select("id")
+    .eq("group_id", id);
+  const ungroupedIds = ((groupDebts ?? []) as { id: string }[]).map(d => d.id);
+
+  // 2. Convert them to individual debts by clearing group_id.
+  if (ungroupedIds.length > 0) {
+    const { error: updateError } = await supabase
+      .from("debts")
+      .update({ group_id: null })
+      .in("id", ungroupedIds);
+    if (updateError) throw new Error(updateError.message);
+  }
+
+  // 3. Delete the group (cascades to group_members).
   const { error } = await supabase.from("groups").delete().eq("id", id);
   if (error) throw new Error(error.message);
+
+  return ungroupedIds;
 }
 
 /**

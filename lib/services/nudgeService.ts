@@ -49,17 +49,30 @@ export async function sendNudge({
     ? `${senderName} reminded you to pay $${amountFormatted} for ${groupName}.`
     : `${senderName} reminded you to pay $${amountFormatted}.`;
 
-  const { error } = await supabase.from("debt_nudges").insert({
-    sender_user_id: user.id,
-    recipient_user_id: recipientUserId,
-    contact_id: contactId,
-    amount_cents: amountCents,
-    message,
-    ...(groupId ? { group_id: groupId } : {}),
-    ...(groupName ? { group_name: groupName } : {}),
-  });
+  const { data: nudgeRow, error } = await supabase
+    .from("debt_nudges")
+    .insert({
+      sender_user_id: user.id,
+      recipient_user_id: recipientUserId,
+      contact_id: contactId,
+      amount_cents: amountCents,
+      message,
+      ...(groupId ? { group_id: groupId } : {}),
+      ...(groupName ? { group_name: groupName } : {}),
+    })
+    .select("id")
+    .single();
 
   if (error) throw new Error(error.message);
+
+  // Dispatch server-side push notification (fire-and-forget; never blocks the nudge)
+  if (nudgeRow?.id) {
+    supabase.functions
+      .invoke("send-nudge-notification", { body: { nudge_id: nudgeRow.id } })
+      .catch((err) => {
+        if (__DEV__) console.warn("[Nudge] push dispatch error:", err);
+      });
+  }
 
   if (__DEV__) {
     const ctx = groupName ? ` [${groupName}]` : "";

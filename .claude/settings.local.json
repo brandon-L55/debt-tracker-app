@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\bdogc\\\\OneDrive\\\\Documents\\\\GitHub\\\\debt-tracker-app\" -Directory)",
+      "Bash(Select-Object Name)"
+    ]
+  }
+}

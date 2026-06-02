@@ -71,9 +71,11 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         cashapp_handle: row.cashapp_handle ?? "",
         paypal_handle: row.paypal_handle ?? "",
       };
-      console.log("[ProfileContext] loaded avatar_url from Supabase:", data.avatar_url);
+      console.log("[ProfileContext] loaded from Supabase — display_name:", data.display_name, "avatar_url:", data.avatar_url);
       setProfile(data);
       AsyncStorage.setItem(CACHE_KEY, JSON.stringify(data));
+    } else {
+      console.log("[ProfileContext] getProfile returned null for userId:", userId);
     }
 
     setIsLoading(false);

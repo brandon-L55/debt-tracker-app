@@ -1,16 +1,23 @@
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { Share } from "react-native";
+import { useState } from "react";
+import { ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRouter } from "expo-router";
 import { useTheme } from "@/context/ThemeContext";
 import { useDebts } from "@/context/DebtContext";
 import { useContacts } from "@/context/ContactsContext";
 import { useGroups } from "@/context/GroupsContext";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 export default function AccountSettingsScreen() {
   const { colors: t } = useTheme();
-  const { debts, reset } = useDebts();
+  const { debts } = useDebts();
   const { individuals } = useContacts();
   const { groups } = useGroups();
+  const { signOut } = useAuth();
+  const router = useRouter();
+
+  const [isResetting, setIsResetting] = useState(false);
 
   async function exportData() {
     const payload = JSON.stringify({ debts, individuals, groups }, null, 2);
@@ -21,69 +28,103 @@ export default function AccountSettingsScreen() {
     }
   }
 
-  function confirmClear() {
-    Alert.alert(
-      "Clear All Data",
-      "This will permanently delete all your debts, friends, and groups. This cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Clear Everything",
-          style: "destructive",
-          onPress: async () => {
-            reset();
-            Alert.alert("Done", "All local data has been cleared.");
-          },
-        },
-      ]
-    );
-  }
-
   function confirmReset() {
     Alert.alert(
-      "Reset App",
-      "This resets the app to its original state, clearing all saved data.",
+      "Reset Account Data",
+      "This permanently deletes all your debts, payments, contacts, groups, friend connections, and nudges from the server.\n\nYour login credentials and profile photo are preserved.\n\nThis cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Reset App",
+          text: "Delete Everything",
           style: "destructive",
-          onPress: async () => {
-            reset();
-            await AsyncStorage.removeItem("@debt_tracker/theme_mode");
-            await AsyncStorage.removeItem("@debt_tracker/profile");
-            Alert.alert("Done", "App has been reset.");
-          },
+          onPress: doReset,
         },
       ]
     );
   }
 
-  const stats = `${individuals.length} individuals · ${groups.length} groups · ${debts.length} debts`;
+  async function doReset() {
+    setIsResetting(true);
+    try {
+      // 15-second client-side timeout so the spinner cannot hang forever.
+      const { error } = await Promise.race([
+        supabase.rpc("reset_account"),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error("The server is taking too long. Please check your connection and try again.")),
+            15_000,
+          )
+        ),
+      ]);
+      if (error) throw error;
+
+      console.log("[AccountReset] RPC succeeded — display_name preserved in DB");
+
+      // Patch the local cache to clear only the fields the RPC nulled out
+      // (payment handles).  display_name and avatar_url are preserved by the
+      // RPC, so keeping them in the cache avoids a blank-name flash on the
+      // next sign-in while the Supabase fetch completes.
+      try {
+        const raw = await AsyncStorage.getItem("@debt_tracker/profile_v2");
+        if (raw) {
+          const cached = JSON.parse(raw);
+          console.log("[AccountReset] display_name in cache before patch:", cached.display_name);
+          await AsyncStorage.setItem(
+            "@debt_tracker/profile_v2",
+            JSON.stringify({ ...cached, venmo_handle: "", cashapp_handle: "", paypal_handle: "" })
+          );
+        }
+      } catch {}
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Something went wrong. Please try again.";
+      console.warn("[AccountReset] failed:", msg);
+      Alert.alert("Reset Failed", msg);
+      setIsResetting(false);
+      return;
+    }
+
+    // RPC succeeded. Sign out, then navigate explicitly.
+    // We can't rely solely on the <Redirect> guard in (tabs)/_layout.tsx
+    // because that guard lives on a background screen while this Stack
+    // screen is focused and may not process the redirect.
+    try {
+      await signOut();
+    } catch (err) {
+      console.warn("[AccountReset] signOut error (non-fatal):", err);
+    }
+    router.replace("/auth/login");
+  }
+
+  const stats = `${individuals.length} contacts · ${groups.length} groups · ${debts.length} debts`;
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: t.bg }} contentContainerStyle={styles.content}>
       <View style={[styles.statsCard, { backgroundColor: t.card, borderColor: t.border }]}>
-        <Text style={[styles.statsLabel, { color: t.textSub }]}>Stored locally</Text>
+        <Text style={[styles.statsLabel, { color: t.textSub }]}>In your account</Text>
         <Text style={[styles.statsValue, { color: t.text }]}>{stats}</Text>
       </View>
 
       <Text style={[styles.sectionLabel, { color: t.textMuted }]}>DATA</Text>
       <View style={[styles.section, { backgroundColor: t.card, borderColor: t.border }]}>
         <Pressable style={[styles.row, { borderBottomColor: t.border }]} onPress={exportData}>
-          <Text style={[styles.rowLabel, { color: t.text }]}>Export Local Data</Text>
+          <Text style={[styles.rowLabel, { color: t.text }]}>Export Data</Text>
           <Text style={[styles.chevron, { color: t.textMuted }]}>›</Text>
         </Pressable>
-        <Pressable style={[styles.row, { borderBottomColor: t.border }]} onPress={confirmClear}>
-          <Text style={[styles.rowLabel, { color: t.red }]}>Clear Local Data</Text>
-        </Pressable>
-        <Pressable style={styles.rowLast} onPress={confirmReset}>
-          <Text style={[styles.rowLabel, { color: t.red }]}>Reset App</Text>
+        <Pressable
+          style={styles.rowLast}
+          onPress={confirmReset}
+          disabled={isResetting}
+        >
+          {isResetting ? (
+            <ActivityIndicator size="small" color={t.red} />
+          ) : (
+            <Text style={[styles.rowLabel, { color: t.red }]}>Reset Account Data</Text>
+          )}
         </Pressable>
       </View>
 
       <Text style={[styles.footer, { color: t.textMuted }]}>
-        All data is stored on this device only. Clearing or resetting cannot be undone.
+        Resetting permanently deletes your data from the server. Your login credentials and profile photo are preserved.
       </Text>
     </ScrollView>
   );

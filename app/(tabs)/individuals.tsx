@@ -324,6 +324,14 @@ export default function IndividualsScreen() {
             <Text style={[styles.emptySubtitle, { color: t.textMuted }]}>
               {individuals.length === 0 ? "Add someone you share debts with." : "Try a different search."}
             </Text>
+            {individuals.length === 0 && (
+              <Pressable
+                style={[styles.emptyBtn, { backgroundColor: t.primary }]}
+                onPress={() => router.push("/add-individual")}
+              >
+                <Text style={styles.emptyBtnText}>+ Add Friend</Text>
+              </Pressable>
+            )}
           </View>
         }
         contentContainerStyle={styles.content}
@@ -369,6 +377,8 @@ const styles = StyleSheet.create({
   emptyIcon: { fontSize: 32 },
   emptyTitle: { fontSize: 18, fontWeight: "700" },
   emptySubtitle: { fontSize: 14 },
+  emptyBtn: { marginTop: 8, borderRadius: 14, paddingHorizontal: 24, paddingVertical: 12 },
+  emptyBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
   card: { borderRadius: 18, padding: 16, borderWidth: 1 },
   cardInner: { flexDirection: "row", alignItems: "center", gap: 12 },
   dragHandle: { paddingHorizontal: 2 },

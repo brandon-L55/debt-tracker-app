@@ -296,7 +296,7 @@ export default function GroupsScreen() {
                 ? { shadowColor: "#7C3AED", shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.65, shadowRadius: 22 }
                 : { shadowColor: "#7C3AED", shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.18, shadowRadius: 14 }),
             }]}>
-              <Text style={styles.emptyIcon}>👥</Text>
+              <Text style={styles.emptyIcon}>🏕️</Text>
             </View>
             <Text style={[styles.emptyTitle, { color: t.text }]}>
               {groups.length === 0 ? "No groups yet." : "No results found."}
@@ -304,6 +304,14 @@ export default function GroupsScreen() {
             <Text style={[styles.emptySubtitle, { color: t.textMuted }]}>
               {groups.length === 0 ? "Organize debts for a trip, event, or friend group." : "Try a different search."}
             </Text>
+            {groups.length === 0 && (
+              <Pressable
+                style={[styles.emptyBtn, { backgroundColor: t.primary }]}
+                onPress={() => router.push("/create-group")}
+              >
+                <Text style={styles.emptyBtnText}>+ Create Group</Text>
+              </Pressable>
+            )}
           </View>
         }
         contentContainerStyle={styles.content}
@@ -347,6 +355,8 @@ const styles = StyleSheet.create({
   emptyIcon: { fontSize: 32 },
   emptyTitle: { fontSize: 18, fontWeight: "700" },
   emptySubtitle: { fontSize: 14, textAlign: "center", paddingHorizontal: 32 },
+  emptyBtn: { marginTop: 8, borderRadius: 14, paddingHorizontal: 24, paddingVertical: 12 },
+  emptyBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
   card: { borderRadius: 18, padding: 16, borderWidth: 1 },
   cardInner: { flexDirection: "row", alignItems: "center", gap: 12 },
   dragHandle: { paddingHorizontal: 2 },

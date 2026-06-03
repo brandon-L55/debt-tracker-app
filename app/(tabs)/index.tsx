@@ -272,6 +272,24 @@ export default function HomeScreen() {
         style={{ marginTop: 4, marginBottom: 4 }}
       />
 
+      {debts.length === 0 && (
+        <View style={styles.emptyState}>
+          <View style={[styles.emptyIconCircle, {
+            backgroundColor: isDark ? "#1C1040" : "#F3EFFF",
+            borderColor: isDark ? "#3D2A7A" : "#DDD6FE",
+            ...(isDark
+              ? { shadowColor: "#7C3AED", shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.65, shadowRadius: 22 }
+              : { shadowColor: "#7C3AED", shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.18, shadowRadius: 14 }),
+          }]}>
+            <Text style={styles.emptyIcon}>🧾</Text>
+          </View>
+          <Text style={[styles.emptyTitle, { color: t.text }]}>No debts yet</Text>
+          <Text style={[styles.emptySubtitle, { color: t.textMuted }]}>
+            Tap &ldquo;Add New Debt&rdquo; above to start tracking what you owe and what&apos;s owed to you.
+          </Text>
+        </View>
+      )}
+
       {debts.length > 0 && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -505,6 +523,11 @@ const styles = StyleSheet.create({
   sortBtn: { width: 36, height: 36, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   sortBtnIcon: { fontSize: 16 },
   sortHint: { fontSize: 12, marginBottom: 10 },
+  emptyState: { marginTop: 40, alignItems: "center", gap: 10, paddingHorizontal: 16 },
+  emptyIconCircle: { width: 80, height: 80, borderRadius: 40, borderWidth: 1, justifyContent: "center", alignItems: "center", marginBottom: 4 },
+  emptyIcon: { fontSize: 32 },
+  emptyTitle: { fontSize: 18, fontWeight: "700" },
+  emptySubtitle: { fontSize: 14, textAlign: "center", lineHeight: 20 },
   emptyFiltered: { padding: 20, alignItems: "center" },
   emptyFilteredText: { fontSize: 14, fontStyle: "italic" },
   debtRow: { borderRadius: 18, padding: 16, marginBottom: 10, borderWidth: 1 },

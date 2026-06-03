@@ -186,6 +186,47 @@ async function resolvePersonForDebt(personInput: string): Promise<{
   return { contactId: contact.id, linkedUserId: null };
 }
 
+// ─── Shared resolution helper ─────────────────────────────────
+
+/**
+ * Resolve a single CreateDebtInput to the concrete ids and cents needed for
+ * a debts INSERT.  Used by both createDebt and createGroupDebts so the lookup
+ * logic stays in one place.
+ */
+async function resolveDebtInputDetails(input: CreateDebtInput): Promise<{
+  contactId: string;
+  linkedUserId: string | null;
+  amountCents: number;
+  status: string;
+  clientRequestId: string;
+}> {
+  let contactId: string;
+  let linkedUserId: string | null = null;
+
+  if (input.contactId) {
+    contactId = input.contactId;
+    const { data: contactRow } = await supabase
+      .from("contacts")
+      .select("linked_user_id")
+      .eq("id", contactId)
+      .maybeSingle();
+    linkedUserId =
+      (contactRow as { linked_user_id: string | null } | null)?.linked_user_id ?? null;
+  } else {
+    const resolved = await resolvePersonForDebt(input.person);
+    contactId = resolved.contactId;
+    linkedUserId = resolved.linkedUserId;
+  }
+
+  return {
+    contactId,
+    linkedUserId,
+    amountCents: Math.round(input.amount * 100),
+    status: input.status ?? "pending",
+    clientRequestId: input.clientRequestId ?? createDebtClientRequestId(),
+  };
+}
+
 // ─── Service functions ────────────────────────────────────────
 
 /**
@@ -332,27 +373,7 @@ export async function createDebt(input: CreateDebtInput): Promise<Debt> {
   } = await supabase.auth.getUser();
   if (userError || !user) throw new Error("Not authenticated");
 
-  let contactId: string;
-  let linkedUserId: string | null = null;
-
-  if (input.contactId) {
-    contactId = input.contactId;
-    // Still resolve linked_user_id from the pre-existing contact so that
-    // cross-account visibility (borrower_user_id / payer_user_id) is set.
-    const { data: contactRow } = await supabase
-      .from("contacts")
-      .select("linked_user_id")
-      .eq("id", contactId)
-      .maybeSingle();
-    linkedUserId = (contactRow as { linked_user_id: string | null } | null)
-      ?.linked_user_id ?? null;
-  } else {
-    const resolved = await resolvePersonForDebt(input.person);
-    contactId = resolved.contactId;
-    linkedUserId = resolved.linkedUserId;
-  }
-
-  const clientRequestId = input.clientRequestId ?? createDebtClientRequestId();
+  const { contactId, linkedUserId, clientRequestId } = await resolveDebtInputDetails(input);
   const payload: Record<string, unknown> = {
     creator_id: user.id,
     client_request_id: clientRequestId,
@@ -443,6 +464,57 @@ export async function createManyDebts(
     ...input,
     clientRequestId: input.clientRequestId ?? createDebtClientRequestId(),
   })));
+}
+
+/**
+ * Create all per-member debt rows for a group expense in a single atomic
+ * Supabase RPC transaction.  If any row fails, the whole operation rolls back
+ * and no partial state is written to the database.
+ *
+ * All inputs must share the same groupId, reason, deadline, and direction
+ * (they describe one group debt split across multiple people).
+ */
+export async function createGroupDebts(inputs: CreateDebtInput[]): Promise<Debt[]> {
+  if (inputs.length === 0) return [];
+
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) throw new Error("Not authenticated");
+
+  // Resolve every member's contact + linked user id before the transaction.
+  // Contact creation is idempotent; only the debt INSERTs must be atomic.
+  const resolved = await Promise.all(inputs.map(resolveDebtInputDetails));
+
+  const first = inputs[0];
+  const debtParams = resolved.map(r => ({
+    contact_id: r.contactId,
+    linked_user_id: r.linkedUserId,
+    amount_cents: r.amountCents,
+    status: r.status,
+    client_request_id: r.clientRequestId,
+  }));
+
+  const { data, error } = await supabase.rpc("create_group_debts", {
+    p_group_id: first.groupId ?? null,
+    p_description: first.reason || null,
+    p_due_date: first.deadline ?? null,
+    p_direction: first.direction,
+    p_debts: debtParams,
+  });
+
+  if (error) throw new Error(error.message ?? "Failed to create group debts");
+
+  const ids: string[] = (data as { ids: string[] }).ids;
+
+  const { data: rows, error: fetchError } = await supabase
+    .from("debts")
+    .select(SELECT_FIELDS)
+    .in("id", ids);
+
+  if (fetchError) throw new Error(fetchError.message);
+
+  const rawDebts = (rows as DebtRow[]).map(row => rowToDebt(row, user.id));
+  await fillMissingPersonNames(rawDebts);
+  return stripMeta(rawDebts);
 }
 
 /**

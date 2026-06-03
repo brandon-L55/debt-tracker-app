@@ -29,7 +29,7 @@ function previewDeadline(input: string): string | null {
 export default function AddGroupDebtScreen() {
   const router = useRouter();
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
-  const { addDebt } = useDebts();
+  const { addGroupDebts } = useDebts();
   const { groups } = useGroups();
   const { individuals } = useContacts();
   const { colors: t } = useTheme();
@@ -43,6 +43,7 @@ export default function AddGroupDebtScreen() {
   const [direction, setDirection] = useState<"them" | "me" | null>(null);
   const [splitEvenly, setSplitEvenly] = useState(false);
   const [deadline, setDeadline] = useState("");
+  const [saving, setSaving] = useState(false);
 
   if (!group) {
     return (
@@ -58,7 +59,7 @@ export default function AddGroupDebtScreen() {
     setSelected(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!group) return;
     const parsedAmount = parseFloat(amount);
     if (!parsedAmount || parsedAmount <= 0) { Alert.alert("Invalid amount", "Please enter an amount greater than $0.00."); return; }
@@ -71,23 +72,33 @@ export default function AddGroupDebtScreen() {
     }
 
     const perPersonAmount = splitEvenly ? parsedAmount / (selected.length + 1) : parsedAmount;
-    for (const memberId of selected) {
+    const memberInputs = selected.map(memberId => {
       const member = group.members.find(m => m.id === memberId)!;
       const contact = member.contactId ? individuals.find(i => i.id === member.contactId) : null;
       const person = contact?.name ?? member.name;
       const isLinked = !!contact?.linkedUserId;
-      addDebt({
+      return {
         person,
         amount: parseFloat(perPersonAmount.toFixed(2)),
-        direction,
+        direction: direction as "them" | "me",
         reason: reason.trim(),
         groupId: resolvedGroupId,
         deadline: deadlineISO,
         contactId: member.contactId,
-        status: isLinked ? undefined : "accepted",
-      });
+        status: (isLinked ? undefined : "accepted") as "accepted" | undefined,
+      };
+    });
+
+    setSaving(true);
+    try {
+      await addGroupDebts(memberInputs);
+      router.replace(resolvedGroupId ? (`/group/${resolvedGroupId}` as any) : "/(tabs)/groups");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Please try again.";
+      Alert.alert("Failed to save group debt", msg);
+    } finally {
+      setSaving(false);
     }
-    router.replace(resolvedGroupId ? (`/group/${resolvedGroupId}` as any) : "/(tabs)/groups");
   }
 
   const parsedAmount = parseFloat(amount) || 0;
@@ -247,7 +258,7 @@ export default function AddGroupDebtScreen() {
 
       </ScrollView>
       <View style={[styles.saveBar, { backgroundColor: t.bg, borderTopColor: t.border }]}>
-        <GradientButton label="Save Debt" onPress={handleSave} />
+        <GradientButton label={saving ? "Saving…" : "Save Debt"} onPress={handleSave} disabled={saving} />
       </View>
       {Platform.OS === "ios" && [ACCESSORY_AMOUNT, ACCESSORY_REASON, ACCESSORY_DEADLINE].map(id => (
         <InputAccessoryView key={id} nativeID={id}>

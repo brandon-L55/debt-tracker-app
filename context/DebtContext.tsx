@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
-import { getDebts, createDebt, updateDebtStatus as serviceUpdateDebtStatus, updateDebtDetails as serviceUpdateDebtDetails, cancelDebt as serviceCancelDebt, createPayment, markDebtManuallyPaid as serviceMarkManualPaid, undoManualPaid as serviceUndoManualPaid } from "@/lib/services/debtService";
+import { getDebts, createDebt, createGroupDebts as serviceCreateGroupDebts, updateDebtStatus as serviceUpdateDebtStatus, updateDebtDetails as serviceUpdateDebtDetails, cancelDebt as serviceCancelDebt, createPayment, markDebtManuallyPaid as serviceMarkManualPaid, undoManualPaid as serviceUndoManualPaid } from "@/lib/services/debtService";
 import type { CreateDebtInput, UpdateDebtDetailsInput } from "@/lib/services/debtService";
 import { showDebtNotification } from "@/lib/services/notificationService";
 
@@ -77,6 +77,12 @@ type DebtContextType = {
   /** Auth user id of the currently signed-in user (null while loading). */
   currentUserId: string | null;
   addDebt: (debt: Omit<Debt, "id" | "createdAt" | "status" | "creatorId" | "remainingAmount" | "totalPaidAmount" | "totalReceivedAmount"> & { status?: Debt["status"]; clientRequestId?: string }) => Promise<void>;
+  /**
+   * Atomically create all per-member debt rows for a group expense in one
+   * Supabase RPC transaction.  Throws if any row fails so callers can surface
+   * the error — no partial state is ever written.
+   */
+  addGroupDebts: (inputs: CreateDebtInput[]) => Promise<void>;
   /** Accept or reject a pending debt; updates local state immediately. */
   updateDebtStatus: (id: string, status: Debt["status"]) => Promise<void>;
   updateDebtDetails: (id: string, updates: UpdateDebtDetailsInput) => Promise<void>;
@@ -379,6 +385,15 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       .then(created => { setDebts(prev => prev.some(d => d.id === created.id) ? prev : [created, ...prev]); });
   }
 
+  async function addGroupDebts(inputs: CreateDebtInput[]): Promise<void> {
+    const created = await serviceCreateGroupDebts(inputs);
+    setDebts(prev => {
+      const existingIds = new Set(prev.map(d => d.id));
+      const newDebts = created.filter(d => !existingIds.has(d.id));
+      return newDebts.length > 0 ? [...newDebts, ...prev] : prev;
+    });
+  }
+
   async function updateDebtStatus(id: string, status: Debt["status"]) {
     localActionEventKeysRef.current.add(`debt:${id}:status:${status}:`);
     await serviceUpdateDebtStatus(id, status);
@@ -562,7 +577,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
 
   return (
     <DebtContext.Provider value={{
-      debts, currentUserId, addDebt, updateDebtStatus, updateDebtDetails, cancelDebt, addPayment,
+      debts, currentUserId, addDebt, addGroupDebts, updateDebtStatus, updateDebtDetails, cancelDebt, addPayment,
       renameDebtPerson,
       markDebtsPaid,
       applyPartialPayment,

@@ -107,6 +107,8 @@ export default function GroupDashboardScreen() {
   const td = today();
   const groupId = Array.isArray(id) ? id[0] : id;
   const group = groups.find(g => g.id === groupId);
+  const groupDebts = debts.filter(d => d.groupId === groupId);
+  const displayDebts = useMemo(() => sortDebts(groupDebts, sort, td), [debts, sort, groupId]);
 
   if (!group) {
     return (
@@ -181,7 +183,6 @@ export default function GroupDashboardScreen() {
     setVisibleMemberCount(PAGE_SIZE);
   }
 
-  const groupDebts = debts.filter(d => d.groupId === groupId);
   const iOwe = groupDebts.filter(d => d.direction === "me").reduce((s, d) => s + d.amount, 0);
   const owedToMe = groupDebts.filter(d => d.direction === "them").reduce((s, d) => s + d.amount, 0);
 
@@ -294,7 +295,6 @@ export default function GroupDashboardScreen() {
     }
   }
 
-  const displayDebts = useMemo(() => sortDebts(groupDebts, sort, td), [debts, sort, groupId]);
   const activeSortLabel = DEBT_SORT_OPTIONS.find(o => o.value === sort)?.label ?? "";
 
   return (

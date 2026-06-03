@@ -32,6 +32,10 @@ type AuthCtx = {
   signIn: (identifier: string, password: string) => Promise<string | null>;
   signUp: (opts: SignUpOptions) => Promise<SignUpResult>;
   signOut: () => Promise<void>;
+  /** Sends a password reset email. Only works if the account has a real email. */
+  resetPassword: (email: string) => Promise<string | null>;
+  /** Re-sends the signup confirmation email for an unconfirmed account. */
+  resendConfirmationEmail: (email: string) => Promise<string | null>;
 };
 
 // ── Internal helpers ─────────────────────────────────────────
@@ -78,6 +82,8 @@ const AuthContext = createContext<AuthCtx>({
   signIn: async () => null,
   signUp: async () => ({ error: null, needsEmailConfirmation: false }),
   signOut: async () => {},
+  resetPassword: async () => null,
+  resendConfirmationEmail: async () => null,
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -125,11 +131,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password });
     if (error) {
       const msg = error.message.toLowerCase();
+      if (msg.includes("email not confirmed")) {
+        return "EMAIL_NOT_CONFIRMED:" + authEmail;
+      }
       if (
         msg.includes("invalid") ||
         msg.includes("credentials") ||
-        msg.includes("password") ||
-        msg.includes("email not confirmed")
+        msg.includes("password")
       ) {
         return "Invalid login information.";
       }
@@ -189,8 +197,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
   }
 
+  async function resetPassword(email: string): Promise<string | null> {
+    const { error } = await supabase.auth.resetPasswordForEmail(
+      email.trim().toLowerCase(),
+      { redirectTo: "debttrackerapp://auth/reset-password" }
+    );
+    if (error) return error.message;
+    return null;
+  }
+
+  async function resendConfirmationEmail(email: string): Promise<string | null> {
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: email.trim().toLowerCase(),
+    });
+    if (error) return error.message;
+    return null;
+  }
+
   return (
-    <AuthContext.Provider value={{ session, isLoading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ session, isLoading, signIn, signUp, signOut, resetPassword, resendConfirmationEmail }}>
       {children}
     </AuthContext.Provider>
   );

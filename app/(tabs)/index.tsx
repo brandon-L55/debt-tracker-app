@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { LinearGradient } from "expo-linear-gradient";
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useDebts } from "@/context/DebtContext";
@@ -6,6 +6,8 @@ import { useTheme } from "@/context/ThemeContext";
 import { useRouter } from "expo-router";
 import type { Debt } from "@/context/DebtContext";
 import { GradientButton } from "@/components/GradientButton";
+import { Bell } from "lucide-react-native";
+import { getUnreadNudges } from "@/lib/services/nudgeService";
 
 type DebtSortOption =
   | "date" | "deadline-soonest" | "deadline-latest"
@@ -93,6 +95,11 @@ export default function HomeScreen() {
   const [editReason, setEditReason] = useState("");
   const [editDeadline, setEditDeadline] = useState("");
   const [editSaving, setEditSaving] = useState(false);
+  const [nudgeCount, setNudgeCount] = useState(0);
+
+  useEffect(() => {
+    getUnreadNudges().then(ns => setNudgeCount(ns.length)).catch(() => {});
+  }, []);
 
   function openEditDebt(debt: Debt) {
     setEditingDebt(debt);
@@ -220,8 +227,24 @@ export default function HomeScreen() {
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: t.bg }} contentContainerStyle={styles.content}>
-      <Text style={[styles.title, { color: t.text }]}>Dashboard</Text>
-      <Text style={[styles.subtitle, { color: t.textSub }]}>Your personal debt dashboard</Text>
+      <View style={styles.headerRow}>
+        <View style={styles.headerText}>
+          <Text style={[styles.title, { color: t.text }]}>Dashboard</Text>
+          <Text style={[styles.subtitle, { color: t.textSub }]}>Your personal debt dashboard</Text>
+        </View>
+        <Pressable
+          style={({ pressed }) => [styles.bellBtn, pressed && { opacity: 0.7 }]}
+          onPress={() => router.push("/nudges" as any)}
+          hitSlop={8}
+        >
+          <Bell size={22} color={t.primary} strokeWidth={1.8} />
+          {nudgeCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{nudgeCount > 99 ? "99+" : String(nudgeCount)}</Text>
+            </View>
+          )}
+        </Pressable>
+      </View>
 
       <View style={styles.statsGrid}>
         {statCards.map(card => (
@@ -462,8 +485,13 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   content: { padding: 24, paddingBottom: 48 },
-  title: { fontSize: 32, fontWeight: "800", marginTop: 60, letterSpacing: -0.5 },
-  subtitle: { fontSize: 15, marginTop: 6, marginBottom: 24 },
+  headerRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginTop: 60, marginBottom: 24 },
+  headerText: { flex: 1 },
+  title: { fontSize: 32, fontWeight: "800", letterSpacing: -0.5 },
+  subtitle: { fontSize: 15, marginTop: 6 },
+  bellBtn: { position: "relative", padding: 4, marginTop: 6 },
+  badge: { position: "absolute", top: 0, right: 0, backgroundColor: "#EF4444", borderRadius: 8, minWidth: 16, height: 16, alignItems: "center", justifyContent: "center", paddingHorizontal: 3 },
+  badgeText: { color: "#fff", fontSize: 9, fontWeight: "800" },
   statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 20 },
   statCard: { width: "47.5%", borderRadius: 20, padding: 16, borderWidth: 1, gap: 10 },
   statTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },

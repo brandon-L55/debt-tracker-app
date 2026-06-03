@@ -7,7 +7,7 @@ import type { ThemeMode } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
 import { ACCENTS } from "@/constants/theme";
 import {
-  User, Wallet, BookOpen, Shield, LogOut, ChevronRight, Sun, Moon,
+  User, Wallet, Shield, LogOut, ChevronRight, Sun, Moon,
 } from "lucide-react-native";
 import { GotchuLatrLogo } from "@/components/GotchuLatrLogo";
 
@@ -34,10 +34,9 @@ export default function SettingsScreen() {
   }
 
   const navRows = [
-    { label: "Profile",          sub: "Name, photo, contact info",      Icon: User,     route: "/settings/profile" },
-    { label: "Payment Apps",     sub: "Venmo, Cash App, PayPal",        Icon: Wallet,   route: "/settings/payment-apps" },
-    { label: "Contacts Access",  sub: "Auto-match names from contacts", Icon: BookOpen, route: "/settings/contacts" },
-    { label: "Account Settings", sub: "Export, clear, or reset data",   Icon: Shield,   route: "/settings/account" },
+    { label: "Profile",          sub: "Name, photo, contact info",    Icon: User,   route: "/settings/profile" },
+    { label: "Payment Apps",     sub: "Venmo, Cash App, PayPal",      Icon: Wallet, route: "/settings/payment-apps" },
+    { label: "Account Settings", sub: "Export, clear, or reset data", Icon: Shield, route: "/settings/account" },
   ];
 
   const themeOptions: { id: ThemeMode; label: string; Icon: typeof Sun }[] = [

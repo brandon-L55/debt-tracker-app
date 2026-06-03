@@ -31,7 +31,7 @@ function isValidUsername(s: string): boolean {
 
 export default function SignupScreen() {
   const router = useRouter();
-  const { signUp } = useAuth();
+  const { signUp, resendConfirmationEmail } = useAuth();
   const { colors: t } = useTheme();
 
   const [phone, setPhone] = useState("");
@@ -45,6 +45,9 @@ export default function SignupScreen() {
   const [error, setError] = useState<string | null>(null);
   const [successState, setSuccessState] = useState<"none" | "confirm_email" | "ready">("none");
   const [loading, setLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendState, setResendState] = useState<"idle" | "sent" | "error">("idle");
+  const [resendError, setResendError] = useState<string | null>(null);
 
   async function handleSignup() {
     setError(null);
@@ -102,6 +105,20 @@ export default function SignupScreen() {
 
   // ── Success: email confirmation needed ────────────────────
   if (successState === "confirm_email") {
+    async function handleResend() {
+      setResendState("idle");
+      setResendError(null);
+      setResendLoading(true);
+      const err = await resendConfirmationEmail(email.trim().toLowerCase());
+      setResendLoading(false);
+      if (err) {
+        setResendError(err);
+        setResendState("error");
+      } else {
+        setResendState("sent");
+      }
+    }
+
     return (
       <View style={[styles.centerContainer, { backgroundColor: t.bg }]}>
         <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
@@ -112,6 +129,19 @@ export default function SignupScreen() {
             <Text style={{ color: t.text, fontWeight: "600" }}>{email.trim().toLowerCase()}</Text>
             {"\n\n"}Click the link to activate your account, then sign in.
           </Text>
+
+          {resendState === "sent" ? (
+            <View style={[styles.infoBox, { backgroundColor: t.greenSoft, borderColor: t.greenBorder }]}>
+              <Text style={[styles.infoText, { color: t.green }]}>Confirmation email resent.</Text>
+            </View>
+          ) : null}
+
+          {resendState === "error" && resendError ? (
+            <View style={[styles.errorBox, { backgroundColor: t.redSoft, borderColor: t.redBorder }]}>
+              <Text style={[styles.errorText, { color: t.red }]}>{resendError}</Text>
+            </View>
+          ) : null}
+
           <Pressable onPress={() => router.replace("/auth/login")}>
             <LinearGradient
               colors={[t.from, t.mid, t.to]}
@@ -121,6 +151,18 @@ export default function SignupScreen() {
             >
               <Text style={styles.buttonText}>Back to Sign In</Text>
             </LinearGradient>
+          </Pressable>
+
+          <Pressable
+            onPress={handleResend}
+            disabled={resendLoading || resendState === "sent"}
+            style={[styles.resendBtn, (resendLoading || resendState === "sent") ? { opacity: 0.5 } : undefined]}
+          >
+            {resendLoading ? (
+              <ActivityIndicator size="small" color={t.textSub} />
+            ) : (
+              <Text style={[styles.resendText, { color: t.textSub }]}>Didn{"'"}t get it? Resend email</Text>
+            )}
           </Pressable>
         </View>
       </View>
@@ -133,7 +175,7 @@ export default function SignupScreen() {
       <View style={[styles.centerContainer, { backgroundColor: t.bg }]}>
         <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
           <Text style={styles.successIcon}>✅</Text>
-          <Text style={[styles.successTitle, { color: t.text }]}>You're all set!</Text>
+          <Text style={[styles.successTitle, { color: t.text }]}>You{"'"}re all set!</Text>
           <Text style={[styles.successBody, { color: t.textSub }]}>
             Your account has been created.{"\n"}
             Sign in with your phone number and password.
@@ -410,4 +452,8 @@ const styles = StyleSheet.create({
   successIcon: { fontSize: 48, textAlign: "center", marginBottom: 8 },
   successTitle: { fontSize: 22, fontWeight: "700", textAlign: "center", marginBottom: 12 },
   successBody: { fontSize: 15, textAlign: "center", lineHeight: 22, marginBottom: 4 },
+  infoBox: { borderRadius: 10, borderWidth: 1, padding: 12 },
+  infoText: { fontSize: 14, textAlign: "center" },
+  resendBtn: { alignItems: "center", paddingVertical: 4 },
+  resendText: { fontSize: 14 },
 });

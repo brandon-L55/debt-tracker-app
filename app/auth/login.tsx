@@ -1,6 +1,5 @@
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -23,7 +22,7 @@ const ACCESSORY_ID = "auth-login";
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { signIn } = useAuth();
+  const { signIn, resendConfirmationEmail } = useAuth();
   const { colors: t } = useTheme();
 
   const [identifier, setIdentifier] = useState("");
@@ -31,9 +30,30 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendState, setResendState] = useState<"idle" | "sent" | "error">("idle");
+  const [resendError, setResendError] = useState<string | null>(null);
+
+  async function handleResend() {
+    if (!unconfirmedEmail) return;
+    setResendState("idle");
+    setResendError(null);
+    setResendLoading(true);
+    const err = await resendConfirmationEmail(unconfirmedEmail);
+    setResendLoading(false);
+    if (err) {
+      setResendError(err);
+      setResendState("error");
+    } else {
+      setResendState("sent");
+    }
+  }
 
   async function handleLogin() {
     setError(null);
+    setUnconfirmedEmail(null);
+    setResendState("idle");
     const trimmedIdentifier = identifier.trim();
 
     if (!trimmedIdentifier) {
@@ -50,7 +70,13 @@ export default function LoginScreen() {
     setLoading(false);
 
     if (err) {
-      setError(err);
+      if (err.startsWith("EMAIL_NOT_CONFIRMED:")) {
+        const email = err.slice("EMAIL_NOT_CONFIRMED:".length);
+        setUnconfirmedEmail(email);
+        setError("Your email address hasn't been confirmed yet. Check your inbox or resend below.");
+      } else {
+        setError(err);
+      }
     } else {
       router.replace("/(tabs)");
     }
@@ -138,6 +164,33 @@ export default function LoginScreen() {
             </View>
           ) : null}
 
+          {/* Resend confirmation — shown only when email is unconfirmed */}
+          {unconfirmedEmail ? (
+            <>
+              {resendState === "sent" ? (
+                <View style={[styles.infoBox, { backgroundColor: t.greenSoft, borderColor: t.greenBorder }]}>
+                  <Text style={[styles.infoText, { color: t.green }]}>Confirmation email resent. Check your inbox.</Text>
+                </View>
+              ) : null}
+              {resendState === "error" && resendError ? (
+                <View style={[styles.errorBox, { backgroundColor: t.redSoft, borderColor: t.redBorder }]}>
+                  <Text style={[styles.errorText, { color: t.red }]}>{resendError}</Text>
+                </View>
+              ) : null}
+              <Pressable
+                onPress={handleResend}
+                disabled={resendLoading || resendState === "sent"}
+                style={[styles.resendBtn, (resendLoading || resendState === "sent") ? { opacity: 0.5 } : undefined]}
+              >
+                {resendLoading ? (
+                  <ActivityIndicator size="small" color={t.textSub} />
+                ) : (
+                  <Text style={[styles.resendText, { color: t.primary }]}>Resend confirmation email</Text>
+                )}
+              </Pressable>
+            </>
+          ) : null}
+
           {/* Submit */}
           <Pressable
             onPress={handleLogin}
@@ -160,9 +213,7 @@ export default function LoginScreen() {
 
           {/* Forgot password */}
           <Pressable
-            onPress={() =>
-              Alert.alert("Forgot password", "Password reset is coming soon.")
-            }
+            onPress={() => router.push("/auth/forgot-password")}
             style={styles.forgotBtn}
           >
             <Text style={[styles.forgotText, { color: t.textSub }]}>Forgot password?</Text>
@@ -189,7 +240,7 @@ export default function LoginScreen() {
         {/* Footer */}
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: t.textSub }]}>
-            Don't have an account?{" "}
+            Don{"'"}t have an account?{" "}
           </Text>
           <Pressable onPress={() => router.push("/auth/signup")}>
             <Text style={[styles.footerLink, { color: t.primary }]}>Sign up</Text>
@@ -289,6 +340,23 @@ const styles = StyleSheet.create({
   },
   forgotText: {
     fontSize: 14,
+  },
+  infoBox: {
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 12,
+  },
+  infoText: {
+    fontSize: 14,
+    textAlign: "center",
+  },
+  resendBtn: {
+    alignItems: "center",
+    paddingVertical: 4,
+  },
+  resendText: {
+    fontSize: 14,
+    fontWeight: "600",
   },
   dividerRow: {
     width: "100%",

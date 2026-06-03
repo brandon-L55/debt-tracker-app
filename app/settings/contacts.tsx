@@ -36,7 +36,7 @@ export default function ContactsScreen() {
       </Pressable>
 
       <Text style={[styles.note, { color: t.textMuted }]}>
-        You can revoke access at any time in your device's Settings app.
+        You can revoke access at any time in your device{"'"}s Settings app.
       </Text>
     </ScrollView>
   );

@@ -11,6 +11,7 @@ import { GroupsProvider } from '@/context/GroupsContext';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ProfileProvider } from '@/context/ProfileContext';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 
 export const unstable_settings = {
@@ -20,6 +21,7 @@ export const unstable_settings = {
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      <ErrorBoundary>
       <ThemeProvider>
         <AuthProvider>
           <ProfileProvider>
@@ -34,6 +36,7 @@ export default function RootLayout() {
           </ProfileProvider>
         </AuthProvider>
       </ThemeProvider>
+      </ErrorBoundary>
     </GestureHandlerRootView>
   );
 }
@@ -89,6 +92,7 @@ function AppShell() {
         <Stack.Screen name="settings/payment-apps" options={{ title: 'Payment Apps' }} />
         <Stack.Screen name="settings/contacts" options={{ title: 'Contacts Access' }} />
         <Stack.Screen name="settings/account" options={{ title: 'Account Settings' }} />
+        <Stack.Screen name="nudges" options={{ title: 'Nudges' }} />
       </Stack>
       <StatusBar style={isDark ? 'light' : 'dark'} />
     </NavThemeProvider>

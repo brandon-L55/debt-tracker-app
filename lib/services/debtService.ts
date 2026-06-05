@@ -2,6 +2,7 @@ import { supabase } from "@/lib/supabase";
 import type { Debt } from "@/context/DebtContext";
 import { isPhoneNumber } from "@/lib/phoneUtils";
 import { findOrCreateContact, findOrCreateContactByEmail } from "./contactsService";
+import type { RawGroupDebt } from "@/lib/utils/simplifyGroupDebts";
 
 // ─── Row shape returned by Supabase (with joined contacts) ─────
 
@@ -731,4 +732,87 @@ export async function undoManualPaid(debtId: string): Promise<void> {
     .eq("id", debtId);
 
   if (error) throw new Error(error.message);
+}
+
+// ─── Types for group simplification ──────────────────────────
+
+type GroupDebtSimplifyRow = {
+  payer_user_id: string | null;
+  payer_contact_id: string | null;
+  borrower_user_id: string | null;
+  borrower_contact_id: string | null;
+  amount_cents: number;
+  paid_cents: number | null;
+  status: string;
+};
+
+type GroupMemberNameRow = {
+  user_id: string | null;
+  contact_id: string | null;
+  display_name: string | null;
+};
+
+/**
+ * Fetch all active debts for a group and return them as absolute
+ * payer/borrower label pairs for use by simplifyGroupDebts().
+ *
+ * RLS note: no policy changes required.  The existing
+ * "debts: participant select" policy already grants every group member
+ * read access to all debts whose group_id matches a group they belong to,
+ * via the is_group_member() SECURITY DEFINER helper.  Likewise,
+ * "group_members: group member select" lets any member read the full
+ * member list for their group, which is how we resolve display names.
+ *
+ * Name resolution order for each participant:
+ *   1. currentUserId match → currentUserLabel ("You")
+ *   2. user_id found in group_members → member display_name
+ *   3. contact_id found in group_members → member display_name
+ *   4. fallback → "Unknown"
+ *
+ * @param groupId           The group whose debts to fetch.
+ * @param currentUserId     Auth UID of the viewing user (shown as "You").
+ * @param currentUserLabel  Display label for the current user (default "You").
+ */
+export async function getGroupDebtsForSimplification(
+  groupId: string,
+  currentUserId: string,
+  currentUserLabel = "You",
+): Promise<RawGroupDebt[]> {
+  // 1. Fetch group members to build id → display_name lookups.
+  const { data: members, error: membersError } = await supabase
+    .from("group_members")
+    .select("user_id, contact_id, display_name")
+    .eq("group_id", groupId);
+  if (membersError) throw new Error(membersError.message);
+
+  const userIdToName = new Map<string, string>();
+  const contactIdToName = new Map<string, string>();
+  for (const m of (members ?? []) as GroupMemberNameRow[]) {
+    const name = m.display_name ?? "";
+    if (m.user_id) userIdToName.set(m.user_id, name);
+    if (m.contact_id) contactIdToName.set(m.contact_id, name);
+  }
+
+  // 2. Fetch all active debts for this group.
+  //    RLS allows group members to read all group debts via is_group_member().
+  const { data: rows, error: debtsError } = await supabase
+    .from("debts")
+    .select("payer_user_id, payer_contact_id, borrower_user_id, borrower_contact_id, amount_cents, paid_cents, status")
+    .eq("group_id", groupId)
+    .in("status", ["accepted", "pending", "partial"]);
+  if (debtsError) throw new Error(debtsError.message);
+
+  // 3. Resolve a participant's display label from their user_id or contact_id.
+  function resolveLabel(userId: string | null, contactId: string | null): string {
+    if (userId && userId === currentUserId) return currentUserLabel;
+    if (userId && userIdToName.has(userId)) return userIdToName.get(userId)!;
+    if (contactId && contactIdToName.has(contactId)) return contactIdToName.get(contactId)!;
+    return "Unknown";
+  }
+
+  return (rows as GroupDebtSimplifyRow[]).map(row => ({
+    payerLabel: resolveLabel(row.payer_user_id, row.payer_contact_id),
+    borrowerLabel: resolveLabel(row.borrower_user_id, row.borrower_contact_id),
+    remainingCents: Math.max(0, row.amount_cents - (row.paid_cents ?? 0)),
+  }));
 }

@@ -1,4 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
+import { simplifyGroupDebts } from "@/lib/utils/simplifyGroupDebts";
+import type { SimplifiedPayment, RawGroupDebt } from "@/lib/utils/simplifyGroupDebts";
+import { getGroupDebtsForSimplification } from "@/lib/services/debtService";
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
@@ -85,6 +88,9 @@ export default function GroupDashboardScreen() {
   const { colors: t } = useTheme();
   const [sort, setSort] = useState<DebtSortOption>("date");
   const [showSortMenu, setShowSortMenu] = useState(false);
+  const [showSimplified, setShowSimplified] = useState(false);
+  const [rawGroupDebts, setRawGroupDebts] = useState<RawGroupDebt[] | null>(null);
+  const [simplifyLoading, setSimplifyLoading] = useState(false);
   const [membersExpanded, setMembersExpanded] = useState(false);
   const [visibleMemberCount, setVisibleMemberCount] = useState(PAGE_SIZE);
   const [addingIds, setAddingIds] = useState<Set<string>>(() => new Set());
@@ -109,6 +115,37 @@ export default function GroupDashboardScreen() {
   const group = groups.find(g => g.id === groupId);
   const groupDebts = debts.filter(d => d.groupId === groupId);
   const displayDebts = useMemo(() => sortDebts(groupDebts, sort, td), [debts, sort, groupId]);
+
+  // A stable fingerprint of the current user's group debts.
+  // When this changes it means a status, amount, or count changed for a debt
+  // the viewer is part of — the simplification data should be re-fetched.
+  const groupDebtKey = useMemo(
+    () =>
+      debts
+        .filter(d => d.groupId === groupId)
+        .map(d => `${d.id}|${d.status}|${Math.round(d.remainingAmount * 100)}`)
+        .sort()
+        .join(","),
+    [debts, groupId],
+  );
+
+  // Fetch ALL active debts for the group (including debts between other members)
+  // using the service, which can read them via the existing RLS is_group_member() policy.
+  useEffect(() => {
+    if (!groupId || !currentUserId) return;
+    let cancelled = false;
+    setSimplifyLoading(true);
+    getGroupDebtsForSimplification(groupId, currentUserId)
+      .then(raw => { if (!cancelled) setRawGroupDebts(raw); })
+      .catch(e => { console.error("[group simplify]", e); if (!cancelled) setRawGroupDebts([]); })
+      .finally(() => { if (!cancelled) setSimplifyLoading(false); });
+    return () => { cancelled = true; };
+  }, [groupId, currentUserId, groupDebtKey]);
+
+  const simplifiedPayments = useMemo<SimplifiedPayment[]>(
+    () => (rawGroupDebts ? simplifyGroupDebts(rawGroupDebts) : []),
+    [rawGroupDebts],
+  );
 
   if (!group) {
     return (
@@ -507,6 +544,42 @@ export default function GroupDashboardScreen() {
         )}
 
         <View style={styles.section}>
+          <Pressable style={styles.sectionHeader} onPress={() => setShowSimplified(s => !s)}>
+            <Text style={[styles.sectionTitle, { color: t.text }]}>Simplified Debts</Text>
+            <Text style={[styles.sortBtnIcon, { color: t.textMuted }]}>{showSimplified ? "▲" : "▼"}</Text>
+          </Pressable>
+          <Text style={[styles.simplifiedSubtitle, { color: t.textMuted }]}>
+            Minimum payments to settle active debts
+          </Text>
+          {showSimplified && (
+            simplifyLoading ? (
+              <View style={[styles.emptyBox, { backgroundColor: t.card, borderColor: t.border }]}>
+                <Text style={[styles.emptyText, { color: t.textMuted }]}>Computing…</Text>
+              </View>
+            ) : simplifiedPayments.length === 0 ? (
+              <View style={[styles.emptyBox, { backgroundColor: t.card, borderColor: t.border }]}>
+                <Text style={[styles.emptyText, { color: t.textMuted }]}>
+                  {rawGroupDebts?.some(d => d.remainingCents > 0)
+                    ? "Debts cancel out — no payments needed."
+                    : "No active debts to simplify."}
+                </Text>
+              </View>
+            ) : (
+              simplifiedPayments.map((p, i) => (
+                <View key={i} style={[styles.simplifiedRow, { backgroundColor: t.card, borderColor: t.border }]}>
+                  <Text style={[styles.simplifiedName, { color: t.red }]} numberOfLines={1}>{p.from}</Text>
+                  <Text style={[styles.simplifiedArrow, { color: t.textMuted }]}>→</Text>
+                  <Text style={[styles.simplifiedName, { color: t.green }]} numberOfLines={1}>{p.to}</Text>
+                  <Text style={[styles.simplifiedAmt, { color: t.text }]}>
+                    ${(p.amountCents / 100).toFixed(2)}
+                  </Text>
+                </View>
+              ))
+            )
+          )}
+        </View>
+
+        <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: t.text }]}>Transactions</Text>
             {groupDebts.length > 0 && (
@@ -635,4 +708,9 @@ const styles = StyleSheet.create({
   menuRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, marginHorizontal: 8, borderRadius: 10 },
   menuRowText: { flex: 1, fontSize: 15 },
   menuCheck: { fontSize: 15, fontWeight: "700" },
+  simplifiedSubtitle: { fontSize: 12, marginBottom: 8 },
+  simplifiedRow: { borderRadius: 14, padding: 14, marginBottom: 8, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 6 },
+  simplifiedName: { fontSize: 14, fontWeight: "700", flex: 1 },
+  simplifiedArrow: { fontSize: 16 },
+  simplifiedAmt: { fontSize: 14, fontWeight: "700" },
 });

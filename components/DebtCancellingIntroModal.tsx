@@ -25,33 +25,26 @@ interface Props {
 
 // ─── Diagram geometry (280 × 220 SVG) ──────────────────────────────────────
 //
-// Node circle centers (radius 26, gap 28px from center to arrow start/end):
+// Node circle centers (radius 26, 28px gap to arrow start/end):
 //   Alex   (140,  26) — top center
 //   Sam    (248, 172) — bottom right
 //   Jordan ( 32, 172) — bottom left
 //   Centroid: (140, 123)
 //
-// Clockwise arrow cycle: Alex → Sam → Jordan → Alex
+// Clockwise cycle: Alex → Sam → Jordan → Alex
+// Control point = midpoint(P1,P2) + 40 × normalize(centroid→midpoint)
+// Start/End = circle edge at 28px from center toward control point.
+// Arrowhead wings: 8px at ±140° from arrival tangent.
 //
-// Each control point = midpoint(P1, P2) + 40 × normalize(centroid → midpoint)
-// This makes every arrow bow outward from the center by the same amount.
-//
-// Start = P1 + 28 × normalize(control − P1)   (leave from circle edge)
-// End   = P2 + 28 × normalize(control − P2)   (arrive at circle edge)
-//
-// Arrowhead wings: 8px, ±140° from the forward tangent at the end point.
-//
-// Resulting paths (computed, symmetric left↔right about x=140):
-//   A→S:  start(164,41)  ctrl(230,83)  end(243,145)
-//   S→J:  start(222,182) ctrl(140,212) end(58,182)
-//   J→A:  start(38,145)  ctrl(50,83)   end(116,41)
+// Paths are left↔right symmetric about x=140:
+//   A→S: start(164,41)  ctrl(230,83)  end(243,145)
+//   S→J: start(222,182) ctrl(140,212) end(58,182)
+//   J→A: start(38,145)  ctrl(50,83)   end(116,41)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ARROW_AS = "M 164 41 Q 230 83 243 145 L 237 140 M 243 145 L 247 138";
 const ARROW_SJ = "M 222 182 Q 140 212 58 182 L 66 179 M 58 182 L 62 189";
 const ARROW_JA = "M 38 145 Q 50 83 116 41 L 114 49 M 116 41 L 108 40";
-
-const SLIDE_H = 220;
 
 function computeInitialPageWidth(): number {
   const screen = Dimensions.get("window").width;
@@ -103,6 +96,95 @@ const pn = StyleSheet.create({
   nameText: { fontSize: 12, fontWeight: "600", marginTop: 5, textAlign: "center" },
 });
 
+// ─── Diagram illustration ─────────────────────────────────────────────────
+//
+// Rendered inside each pager page so the full diagram area is part of the
+// scroll view and responds to horizontal swipe gestures correctly.
+// Slide 1: solid purple arrows. Slide 2: faded dashed arrows + centre ✓.
+
+interface DiagramContentProps {
+  isSlide2: boolean;
+  checkScale: Animated.Value;
+}
+
+function DiagramContent({ isSlide2, checkScale }: DiagramContentProps) {
+  const { colors: t } = useTheme();
+
+  const arrowColor   = isSlide2 ? t.textMuted : t.primary;
+  const arrowDash    = isSlide2 ? "6 4" : undefined;
+  const arrowOpacity = isSlide2 ? 0.45 : 1;
+
+  return (
+    <View style={m.diag}>
+      {/*
+        pointerEvents="none" on the SVG layer so touches pass through to the
+        parent page View and up to the ScrollView for horizontal paging.
+      */}
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Svg width={280} height={220}>
+          <Path
+            d={ARROW_AS}
+            stroke={arrowColor}
+            strokeWidth={2.5}
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeDasharray={arrowDash}
+            opacity={arrowOpacity}
+          />
+          <Path
+            d={ARROW_SJ}
+            stroke={arrowColor}
+            strokeWidth={2.5}
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeDasharray={arrowDash}
+            opacity={arrowOpacity}
+          />
+          <Path
+            d={ARROW_JA}
+            stroke={arrowColor}
+            strokeWidth={2.5}
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeDasharray={arrowDash}
+            opacity={arrowOpacity}
+          />
+        </Svg>
+
+        {/* "owes $20" labels near each arrow's visual midpoint */}
+        <Text style={[m.arrowLabel, { color: t.textSub, top: 56, right: 3 }]}>owes $20</Text>
+        <Text style={[m.arrowLabel, { color: t.textSub, top: 201, left: 104 }]}>owes $20</Text>
+        <Text style={[m.arrowLabel, { color: t.textSub, top: 74, left: 1 }]}>owes $20</Text>
+      </View>
+
+      {/* Person nodes — no touch handlers so gestures bubble to ScrollView */}
+      <View style={m.nodeTop}>
+        <PersonNode name="Alex" showCheck={isSlide2} />
+      </View>
+      <View style={m.nodeBottom}>
+        <PersonNode name="Jordan" />
+        <PersonNode name="Sam" />
+      </View>
+
+      {/* Centre ✓ — only present on slide 2, springs in when slide changes */}
+      {isSlide2 && (
+        <Animated.View
+          style={[
+            m.centerCheck,
+            { backgroundColor: t.green },
+            { transform: [{ scale: checkScale }] },
+          ]}
+        >
+          <Text style={m.centerCheckText}>✓</Text>
+        </Animated.View>
+      )}
+    </View>
+  );
+}
+
 // ─── Main modal ──────────────────────────────────────────────────────────────
 
 export function DebtCancellingIntroModal({ visible, onClose, onEnable }: Props) {
@@ -111,7 +193,7 @@ export function DebtCancellingIntroModal({ visible, onClose, onEnable }: Props) 
   const [pageWidth, setPageWidth] = useState(computeInitialPageWidth);
 
   const scrollRef = useRef<ScrollView>(null);
-  // Tracks previous slide to distinguish initial open (prev=-1) from slide changes
+  // Tracks previous slide to distinguish initial open (prev=-1) from real transitions
   const prevSlideRef = useRef(-1);
   // Spring the centre ✓ in on slide 2
   const checkScale = useRef(new Animated.Value(0)).current;
@@ -134,7 +216,7 @@ export function DebtCancellingIntroModal({ visible, onClose, onEnable }: Props) 
     const prev = prevSlideRef.current;
     prevSlideRef.current = slide;
 
-    if (prev === -1) return; // initial modal open, already handled above
+    if (prev === -1) return; // initial open handled above
 
     if (slide === 1) {
       Animated.spring(checkScale, {
@@ -144,7 +226,7 @@ export function DebtCancellingIntroModal({ visible, onClose, onEnable }: Props) 
         friction: 8,
       }).start();
     } else if (prev === 1) {
-      // Swiped back to slide 1
+      // Swiped back to slide 1 — collapse the check instantly
       checkScale.setValue(0);
     }
   }, [slide, visible]);
@@ -165,11 +247,6 @@ export function DebtCancellingIntroModal({ visible, onClose, onEnable }: Props) 
     if (Math.abs(w - pageWidth) > 1) setPageWidth(w);
   };
 
-  // Slide 1: solid purple arrows. Slide 2: faded dashed arrows (debts cancelled).
-  const arrowColor = slide === 0 ? t.primary : t.textMuted;
-  const arrowDash = slide === 0 ? undefined : "6 4";
-  const arrowOpacity = slide === 0 ? 1 : 0.45;
-
   return (
     <Modal
       visible={visible}
@@ -181,7 +258,7 @@ export function DebtCancellingIntroModal({ visible, onClose, onEnable }: Props) 
       <View style={m.overlay}>
         <View style={[m.card, { backgroundColor: t.card }]}>
 
-          {/* ── X dismiss ────────────────────────────────────────────────── */}
+          {/* ── X dismiss (sits above the pager) ─────────────────────────── */}
           <Pressable
             style={[m.closeBtn, { backgroundColor: t.bg2, borderColor: t.border }]}
             onPress={onClose}
@@ -191,75 +268,11 @@ export function DebtCancellingIntroModal({ visible, onClose, onEnable }: Props) 
             <Text style={[m.closeBtnText, { color: t.textMuted }]}>×</Text>
           </Pressable>
 
-          {/* ── Triangle diagram (fixed across both slides) ───────────────── */}
-          <View style={m.diag}>
-
-            {/* Static SVG arrows — all three share the same stroke style */}
-            <View style={StyleSheet.absoluteFill} pointerEvents="none">
-              <Svg width={280} height={220}>
-                <Path
-                  d={ARROW_AS}
-                  stroke={arrowColor}
-                  strokeWidth={2.5}
-                  fill="none"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeDasharray={arrowDash}
-                  opacity={arrowOpacity}
-                />
-                <Path
-                  d={ARROW_SJ}
-                  stroke={arrowColor}
-                  strokeWidth={2.5}
-                  fill="none"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeDasharray={arrowDash}
-                  opacity={arrowOpacity}
-                />
-                <Path
-                  d={ARROW_JA}
-                  stroke={arrowColor}
-                  strokeWidth={2.5}
-                  fill="none"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeDasharray={arrowDash}
-                  opacity={arrowOpacity}
-                />
-              </Svg>
-
-              {/* "owes $20" labels — positioned near each arrow's visual midpoint */}
-              <Text style={[m.arrowLabel, { color: t.textSub, top: 56, right: 3 }]}>owes $20</Text>
-              <Text style={[m.arrowLabel, { color: t.textSub, top: 201, left: 104 }]}>owes $20</Text>
-              <Text style={[m.arrowLabel, { color: t.textSub, top: 74, left: 1 }]}>owes $20</Text>
-            </View>
-
-            {/* Person nodes (rendered on top of SVG) */}
-            <View style={m.nodeTop}>
-              <PersonNode name="Alex" showCheck={slide === 1} />
-            </View>
-            <View style={m.nodeBottom}>
-              <PersonNode name="Jordan" />
-              <PersonNode name="Sam" />
-            </View>
-
-            {/* Centre ✓ — springs in on slide 2 */}
-            <Animated.View
-              style={[
-                m.centerCheck,
-                { backgroundColor: t.green },
-                { transform: [{ scale: checkScale }] },
-              ]}
-            >
-              <Text style={m.centerCheckText}>✓</Text>
-            </Animated.View>
-          </View>
-
-          {/* ── Horizontal pager (slide text content) ────────────────────── */}
           {/*
-            onLayout gives the exact inner width so pagingEnabled snaps correctly.
-            computeInitialPageWidth() seeds the first render to avoid a blank flash.
+            ── Horizontal pager ───────────────────────────────────────────────
+            The diagram is INSIDE each page so that touching or dragging the
+            illustration triggers the ScrollView's horizontal swipe gesture,
+            not just dragging on the text below.
           */}
           <View onLayout={handlePagerLayout}>
             <ScrollView
@@ -271,10 +284,10 @@ export function DebtCancellingIntroModal({ visible, onClose, onEnable }: Props) 
               decelerationRate="fast"
               scrollEventThrottle={16}
               onMomentumScrollEnd={handleScrollEnd}
-              style={{ height: SLIDE_H }}
             >
               {/* ── Slide 1 ─────────────────────────────────────────────── */}
               <View style={{ width: pageWidth }}>
+                <DiagramContent isSlide2={false} checkScale={checkScale} />
                 <Text style={[m.title, { color: t.text }]}>
                   Group debts can cancel out
                 </Text>
@@ -287,6 +300,7 @@ export function DebtCancellingIntroModal({ visible, onClose, onEnable }: Props) 
 
               {/* ── Slide 2 ─────────────────────────────────────────────── */}
               <View style={{ width: pageWidth }}>
+                <DiagramContent isSlide2={true} checkScale={checkScale} />
                 <Text style={[m.title, { color: t.text }]}>
                   Fewer payments. Less confusion.
                 </Text>
@@ -363,7 +377,7 @@ const m = StyleSheet.create({
     elevation: 24,
   },
 
-  // X dismiss (absolute top-right)
+  // X dismiss (absolute top-right, above the pager)
   closeBtn: {
     position: "absolute",
     top: 14,
@@ -378,7 +392,7 @@ const m = StyleSheet.create({
   },
   closeBtnText: { fontSize: 20, lineHeight: 26, fontWeight: "300" },
 
-  // Diagram container
+  // Diagram container (inside each pager page)
   diag: {
     width: 280,
     height: 220,
@@ -386,7 +400,7 @@ const m = StyleSheet.create({
     marginBottom: 4,
   },
 
-  // Node positioning inside diag (absolute)
+  // Node positioning (absolute inside diag)
   nodeTop: {
     position: "absolute",
     top: 0,
@@ -403,14 +417,14 @@ const m = StyleSheet.create({
     justifyContent: "space-between",
   },
 
-  // "owes $20" labels (absolute inside arrow View)
+  // "owes $20" labels (absolute inside the SVG layer View)
   arrowLabel: {
     position: "absolute",
     fontSize: 10,
     fontWeight: "600",
   },
 
-  // Centre ✓ (slide 2)
+  // Centre ✓ (slide 2 only)
   centerCheck: {
     position: "absolute",
     top: 106,

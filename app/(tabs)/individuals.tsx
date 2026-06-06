@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { DoneBar } from "@/components/DoneBar";
 import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import { useFocusEffect, useRouter } from "expo-router";
 // @ts-ignore — forwardRef deprecation hint from React 19; library still works correctly
@@ -33,6 +34,8 @@ function latestDebtDate(name: string, debts: Debt[]): number {
   if (matches.length === 0) return 0;
   return Math.max(...matches.map(d => new Date(d.createdAt).getTime()));
 }
+
+const SEARCH_ACCESSORY_ID = "individuals-search";
 
 export default function IndividualsScreen() {
   const router = useRouter();
@@ -255,6 +258,7 @@ export default function IndividualsScreen() {
           onChangeText={setSearch}
           clearButtonMode="while-editing"
           returnKeyType="search"
+          inputAccessoryViewID={SEARCH_ACCESSORY_ID}
         />
         <Pressable
           style={[styles.sortBtn, {
@@ -336,8 +340,10 @@ export default function IndividualsScreen() {
         }
         contentContainerStyle={styles.content}
         keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
         ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
       />
+      <DoneBar nativeID={SEARCH_ACCESSORY_ID} />
 
       <Modal visible={showSortMenu} transparent animationType="fade" onRequestClose={() => setShowSortMenu(false)}>
         <Pressable style={styles.overlay} onPress={() => setShowSortMenu(false)}>

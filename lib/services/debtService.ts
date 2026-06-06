@@ -752,32 +752,40 @@ type GroupMemberNameRow = {
   display_name: string | null;
 };
 
+export type SimplificationResult = {
+  rawDebts: RawGroupDebt[];
+  /**
+   * True when at least one active approved debt was skipped because either the
+   * payer or borrower has not opted into Debt Cancelling for this group.
+   * Used to show the "some debts excluded" banner in the UI.
+   */
+  hasExcludedDebts: boolean;
+};
+
 /**
- * Fetch all active debts for a group and return them as absolute
- * payer/borrower label pairs for use by simplifyGroupDebts().
+ * Fetch approved debts for a group and return only those where both parties
+ * have opted into Debt Cancelling, as absolute payer/borrower label pairs
+ * for use by simplifyGroupDebts().
  *
- * RLS note: no policy changes required.  The existing
- * "debts: participant select" policy already grants every group member
- * read access to all debts whose group_id matches a group they belong to,
- * via the is_group_member() SECURITY DEFINER helper.  Likewise,
- * "group_members: group member select" lets any member read the full
- * member list for their group, which is how we resolve display names.
+ * Filtering rules:
+ *  - Only "accepted" and "partial" debts are included (pending = not yet approved).
+ *  - Both payer and borrower must be real app users (have a user_id).
+ *  - Both must have enabled = true in group_debt_cancelling_preferences.
+ *  - Debts involving manual contacts are always excluded (contacts cannot opt in).
  *
- * Name resolution order for each participant:
- *   1. currentUserId match → currentUserLabel ("You")
- *   2. user_id found in group_members → member display_name
- *   3. contact_id found in group_members → member display_name
- *   4. fallback → "Unknown"
- *
- * @param groupId           The group whose debts to fetch.
- * @param currentUserId     Auth UID of the viewing user (shown as "You").
- * @param currentUserLabel  Display label for the current user (default "You").
+ * RLS notes:
+ *  - "debts: participant select" allows group members to read all group debts
+ *    via the is_group_member() SECURITY DEFINER helper.
+ *  - "debt_cancelling_prefs: group member select" (migration 20260606000001)
+ *    allows any group member to read preferences for their group so the opt-in
+ *    set can be built from all members, not just the current user.
+ *  - "group_members: group member select" lets any member read the member list.
  */
 export async function getGroupDebtsForSimplification(
   groupId: string,
   currentUserId: string,
   currentUserLabel = "You",
-): Promise<RawGroupDebt[]> {
+): Promise<SimplificationResult> {
   // 1. Fetch group members to build id → display_name lookups.
   const { data: members, error: membersError } = await supabase
     .from("group_members")
@@ -793,16 +801,28 @@ export async function getGroupDebtsForSimplification(
     if (m.contact_id) contactIdToName.set(m.contact_id, name);
   }
 
-  // 2. Fetch all active debts for this group.
-  //    RLS allows group members to read all group debts via is_group_member().
+  // 2. Fetch the set of user IDs who have opted into Debt Cancelling for this group.
+  //    The "group member select" RLS policy lets any member read all rows here.
+  const { data: prefs, error: prefsError } = await supabase
+    .from("group_debt_cancelling_preferences")
+    .select("user_id")
+    .eq("group_id", groupId)
+    .eq("enabled", true);
+  if (prefsError) throw new Error(prefsError.message);
+
+  const optedInUserIds = new Set<string>(
+    (prefs ?? []).map((p: { user_id: string }) => p.user_id),
+  );
+
+  // 3. Fetch approved debts only — pending debts are not yet agreed upon.
   const { data: rows, error: debtsError } = await supabase
     .from("debts")
     .select("payer_user_id, payer_contact_id, borrower_user_id, borrower_contact_id, amount_cents, paid_cents, status")
     .eq("group_id", groupId)
-    .in("status", ["accepted", "pending", "partial"]);
+    .in("status", ["accepted", "partial"]);
   if (debtsError) throw new Error(debtsError.message);
 
-  // 3. Resolve a participant's display label from their user_id or contact_id.
+  // 4. Resolve a participant's display label from their user_id or contact_id.
   function resolveLabel(userId: string | null, contactId: string | null): string {
     if (userId && userId === currentUserId) return currentUserLabel;
     if (userId && userIdToName.has(userId)) return userIdToName.get(userId)!;
@@ -810,9 +830,31 @@ export async function getGroupDebtsForSimplification(
     return "Unknown";
   }
 
-  return (rows as GroupDebtSimplifyRow[]).map(row => ({
-    payerLabel: resolveLabel(row.payer_user_id, row.payer_contact_id),
-    borrowerLabel: resolveLabel(row.borrower_user_id, row.borrower_contact_id),
-    remainingCents: Math.max(0, row.amount_cents - (row.paid_cents ?? 0)),
-  }));
+  // 5. Include a debt only when both payer and borrower are opted-in app users.
+  //    Debts involving a manual contact (null user_id on either side) are always
+  //    excluded because contacts have no account and cannot opt in.
+  let hasExcludedDebts = false;
+  const rawDebts: RawGroupDebt[] = [];
+
+  for (const row of (rows ?? []) as GroupDebtSimplifyRow[]) {
+    const remaining = Math.max(0, row.amount_cents - (row.paid_cents ?? 0));
+    if (remaining <= 0) continue;
+
+    const payerOptedIn =
+      row.payer_user_id !== null && optedInUserIds.has(row.payer_user_id);
+    const borrowerOptedIn =
+      row.borrower_user_id !== null && optedInUserIds.has(row.borrower_user_id);
+
+    if (payerOptedIn && borrowerOptedIn) {
+      rawDebts.push({
+        payerLabel: resolveLabel(row.payer_user_id, row.payer_contact_id),
+        borrowerLabel: resolveLabel(row.borrower_user_id, row.borrower_contact_id),
+        remainingCents: remaining,
+      });
+    } else {
+      hasExcludedDebts = true;
+    }
+  }
+
+  return { rawDebts, hasExcludedDebts };
 }

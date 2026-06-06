@@ -1,5 +1,6 @@
 import { GradientButton } from "@/components/GradientButton";
 import { Avatar } from "@/components/Avatar";
+import { DoneBar } from "@/components/DoneBar";
 import { useDebts } from "@/context/DebtContext";
 import { useContacts } from "@/context/ContactsContext";
 import { useTheme } from "@/context/ThemeContext";
@@ -11,7 +12,6 @@ import type { Individual } from "@/context/DebtContext";
 import {
   Alert,
   Dimensions,
-  InputAccessoryView,
   Keyboard,
   Platform,
   Pressable,
@@ -279,10 +279,7 @@ export default function AddDebtScreen() {
   const splitAmount =
     people.length > 0 ? parsedAmount / (people.length + 1) : 0;
   const deadlinePreview = previewDeadline(deadline);
-  const ACCESSORY_PERSON = "add-debt-person";
-  const ACCESSORY_AMOUNT = "add-debt-amount";
-  const ACCESSORY_REASON = "add-debt-reason";
-  const ACCESSORY_DEADLINE = "add-debt-deadline";
+  const ACCESSORY_ID = "add-debt";
 
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
@@ -316,7 +313,7 @@ export default function AddDebtScreen() {
                 color: t.text,
               },
             ]}
-            inputAccessoryViewID={ACCESSORY_PERSON}
+            inputAccessoryViewID={ACCESSORY_ID}
             placeholder="Name, phone, or @username"
             placeholderTextColor={t.textMuted}
             value={personInput}
@@ -419,7 +416,7 @@ export default function AddDebtScreen() {
                 color: t.text,
               },
             ]}
-            inputAccessoryViewID={ACCESSORY_AMOUNT}
+            inputAccessoryViewID={ACCESSORY_ID}
             placeholder="0.00"
             placeholderTextColor={t.textMuted}
             keyboardType="decimal-pad"
@@ -511,7 +508,7 @@ export default function AddDebtScreen() {
                 color: t.text,
               },
             ]}
-            inputAccessoryViewID={ACCESSORY_REASON}
+            inputAccessoryViewID={ACCESSORY_ID}
             placeholder="Dinner, tickets, Uber, rent, etc."
             placeholderTextColor={t.textMuted}
             multiline
@@ -555,7 +552,7 @@ export default function AddDebtScreen() {
                   color: t.text,
                 },
               ]}
-              inputAccessoryViewID={ACCESSORY_DEADLINE}
+              inputAccessoryViewID={ACCESSORY_ID}
               placeholder="MM/DD/YYYY"
               placeholderTextColor={t.textMuted}
               value={deadline}
@@ -593,28 +590,7 @@ export default function AddDebtScreen() {
       >
         <GradientButton label="Save Debt" onPress={handleSave} disabled={isSaving} />
       </View>
-      {Platform.OS === "ios" &&
-        [
-          ACCESSORY_PERSON,
-          ACCESSORY_AMOUNT,
-          ACCESSORY_REASON,
-          ACCESSORY_DEADLINE,
-        ].map((id) => (
-          <InputAccessoryView key={id} nativeID={id}>
-            <View
-              style={[
-                styles.accessory,
-                { backgroundColor: t.card, borderTopColor: t.border },
-              ]}
-            >
-              <Pressable onPress={Keyboard.dismiss} hitSlop={8}>
-                <Text style={[styles.accessoryDone, { color: t.primary }]}>
-                  Done
-                </Text>
-              </Pressable>
-            </View>
-          </InputAccessoryView>
-        ))}
+      <DoneBar nativeID={ACCESSORY_ID} />
     </View>
   );
 }

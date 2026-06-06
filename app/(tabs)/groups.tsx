@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { Alert, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { DoneBar } from "@/components/DoneBar";
 import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import { useFocusEffect, useRouter } from "expo-router";
 // @ts-ignore — forwardRef deprecation hint from React 19; library still works correctly
@@ -34,6 +35,8 @@ function calcGroupTotal(groupId: string, debts: Debt[]): number {
   return debts.filter(d => d.groupId === groupId)
     .reduce((s, d) => s + (d.direction === "them" ? d.amount : -d.amount), 0);
 }
+
+const SEARCH_ACCESSORY_ID = "groups-search";
 
 export default function GroupsScreen() {
   const router = useRouter();
@@ -253,6 +256,7 @@ export default function GroupsScreen() {
           onChangeText={setSearch}
           clearButtonMode="while-editing"
           returnKeyType="search"
+          inputAccessoryViewID={SEARCH_ACCESSORY_ID}
         />
         <Pressable
           style={[styles.sortBtn, {
@@ -316,8 +320,10 @@ export default function GroupsScreen() {
         }
         contentContainerStyle={styles.content}
         keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
         ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
       />
+      <DoneBar nativeID={SEARCH_ACCESSORY_ID} />
 
       <Modal visible={showSortMenu} transparent animationType="fade" onRequestClose={() => setShowSortMenu(false)}>
         <Pressable style={styles.overlay} onPress={() => setShowSortMenu(false)}>

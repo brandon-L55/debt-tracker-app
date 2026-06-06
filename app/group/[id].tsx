@@ -2,7 +2,13 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { simplifyGroupDebts } from "@/lib/utils/simplifyGroupDebts";
 import type { SimplifiedPayment, RawGroupDebt } from "@/lib/utils/simplifyGroupDebts";
 import { getGroupDebtsForSimplification } from "@/lib/services/debtService";
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import type { SimplificationResult } from "@/lib/services/debtService";
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { DebtCancellingIntroModal } from "@/components/DebtCancellingIntroModal";
+import {
+  getDebtCancellingPref,
+  upsertDebtCancellingPref,
+} from "@/lib/services/debtCancellingService";
 import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useDebts } from "@/context/DebtContext";
@@ -90,6 +96,11 @@ export default function GroupDashboardScreen() {
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [showSimplified, setShowSimplified] = useState(false);
   const [rawGroupDebts, setRawGroupDebts] = useState<RawGroupDebt[] | null>(null);
+  const [hasExcludedDebts, setHasExcludedDebts] = useState(false);
+  const [simplifyVersion, setSimplifyVersion] = useState(0);
+  const [showCancellingModal, setShowCancellingModal] = useState(false);
+  const [cancellingEnabled, setCancellingEnabled] = useState(false);
+  const [prefLoaded, setPrefLoaded] = useState(false);
   const [simplifyLoading, setSimplifyLoading] = useState(false);
   const [membersExpanded, setMembersExpanded] = useState(false);
   const [visibleMemberCount, setVisibleMemberCount] = useState(PAGE_SIZE);
@@ -110,6 +121,68 @@ export default function GroupDashboardScreen() {
     memberNudgeCooldownTimers.current.forEach(t => clearTimeout(t));
   }, []);
 
+  // Load Debt Cancelling preference from Supabase once userId + groupId are ready.
+  // Shows the intro popup automatically on first visit (intro_seen = false or no row yet).
+  useEffect(() => {
+    const gId = Array.isArray(id) ? id[0] : id;
+    if (!currentUserId || !gId) return;
+    let cancelled = false;
+
+    getDebtCancellingPref(gId)
+      .then(pref => {
+        if (cancelled) return;
+        if (pref === null || !pref.introSeen) {
+          // First time in this group — show the intro
+          setShowCancellingModal(true);
+          setCancellingEnabled(false);
+        } else {
+          setCancellingEnabled(pref.enabled);
+        }
+        setPrefLoaded(true);
+      })
+      .catch(e => {
+        console.error("[DebtCancelling] pref fetch error:", e);
+        if (!cancelled) setPrefLoaded(true);
+      });
+
+    return () => { cancelled = true; };
+  }, [currentUserId, id]);
+
+  /** "Not Now" or X — marks intro seen, leaves enabled=false */
+  function handleCancellingClose() {
+    const gId = Array.isArray(id) ? id[0] : id;
+    if (gId) upsertDebtCancellingPref(gId, { introSeen: true, enabled: false }).catch(() => {});
+    setShowCancellingModal(false);
+    setPrefLoaded(true);
+  }
+
+  /** "Use Debt Cancelling" — marks intro seen, enables for this group, expands the section */
+  function handleCancellingEnable() {
+    const gId = Array.isArray(id) ? id[0] : id;
+    if (gId) {
+      upsertDebtCancellingPref(gId, { introSeen: true, enabled: true })
+        .then(() => setSimplifyVersion(v => v + 1)) // re-fetch after write lands
+        .catch(() => {});
+    }
+    setCancellingEnabled(true);
+    setShowCancellingModal(false);
+    setShowSimplified(true);
+    setPrefLoaded(true);
+  }
+
+  /** Toggle handler for the on/off switch in the section card */
+  async function handleToggleCancelling(value: boolean) {
+    const gId = Array.isArray(id) ? id[0] : id;
+    setCancellingEnabled(value); // optimistic
+    try {
+      if (gId) await upsertDebtCancellingPref(gId, { enabled: value });
+      setSimplifyVersion(v => v + 1); // re-fetch so opt-in list is current
+    } catch {
+      setCancellingEnabled(!value); // revert on failure
+      Alert.alert("Error", "Couldn't update your preference. Please try again.");
+    }
+  }
+
   const td = today();
   const groupId = Array.isArray(id) ? id[0] : id;
   const group = groups.find(g => g.id === groupId);
@@ -129,18 +202,27 @@ export default function GroupDashboardScreen() {
     [debts, groupId],
   );
 
-  // Fetch ALL active debts for the group (including debts between other members)
-  // using the service, which can read them via the existing RLS is_group_member() policy.
+  // Fetch opted-in debts for the simplified view.
+  // Re-runs when debts change (groupDebtKey) or when the user's opt-in preference
+  // is saved to the DB (simplifyVersion), so the preview stays in sync.
   useEffect(() => {
     if (!groupId || !currentUserId) return;
     let cancelled = false;
     setSimplifyLoading(true);
     getGroupDebtsForSimplification(groupId, currentUserId)
-      .then(raw => { if (!cancelled) setRawGroupDebts(raw); })
-      .catch(e => { console.error("[group simplify]", e); if (!cancelled) setRawGroupDebts([]); })
+      .then((result: SimplificationResult) => {
+        if (!cancelled) {
+          setRawGroupDebts(result.rawDebts);
+          setHasExcludedDebts(result.hasExcludedDebts);
+        }
+      })
+      .catch(e => {
+        console.error("[group simplify]", e);
+        if (!cancelled) { setRawGroupDebts([]); setHasExcludedDebts(false); }
+      })
       .finally(() => { if (!cancelled) setSimplifyLoading(false); });
     return () => { cancelled = true; };
-  }, [groupId, currentUserId, groupDebtKey]);
+  }, [groupId, currentUserId, groupDebtKey, simplifyVersion]);
 
   const simplifiedPayments = useMemo<SimplifiedPayment[]>(
     () => (rawGroupDebts ? simplifyGroupDebts(rawGroupDebts) : []),
@@ -544,38 +626,96 @@ export default function GroupDashboardScreen() {
         )}
 
         <View style={styles.section}>
-          <Pressable style={styles.sectionHeader} onPress={() => setShowSimplified(s => !s)}>
+          {/* ── Section header ───────────────────────────────────────── */}
+          <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: t.text }]}>Simplified Debts</Text>
-            <Text style={[styles.sortBtnIcon, { color: t.textMuted }]}>{showSimplified ? "▲" : "▼"}</Text>
-          </Pressable>
-          <Text style={[styles.simplifiedSubtitle, { color: t.textMuted }]}>
-            Minimum payments to settle active debts
-          </Text>
+            <Pressable onPress={() => setShowSimplified(s => !s)} hitSlop={12}>
+              <Text style={[styles.sortBtnIcon, { color: t.textMuted }]}>{showSimplified ? "▲" : "▼"}</Text>
+            </Pressable>
+          </View>
+
           {showSimplified && (
-            simplifyLoading ? (
-              <View style={[styles.emptyBox, { backgroundColor: t.card, borderColor: t.border }]}>
-                <Text style={[styles.emptyText, { color: t.textMuted }]}>Computing…</Text>
-              </View>
-            ) : simplifiedPayments.length === 0 ? (
-              <View style={[styles.emptyBox, { backgroundColor: t.card, borderColor: t.border }]}>
-                <Text style={[styles.emptyText, { color: t.textMuted }]}>
-                  {rawGroupDebts?.some(d => d.remainingCents > 0)
-                    ? "Debts cancel out — no payments needed."
-                    : "No active debts to simplify."}
-                </Text>
-              </View>
-            ) : (
-              simplifiedPayments.map((p, i) => (
-                <View key={i} style={[styles.simplifiedRow, { backgroundColor: t.card, borderColor: t.border }]}>
-                  <Text style={[styles.simplifiedName, { color: t.red }]} numberOfLines={1}>{p.from}</Text>
-                  <Text style={[styles.simplifiedArrow, { color: t.textMuted }]}>→</Text>
-                  <Text style={[styles.simplifiedName, { color: t.green }]} numberOfLines={1}>{p.to}</Text>
-                  <Text style={[styles.simplifiedAmt, { color: t.text }]}>
-                    ${(p.amountCents / 100).toFixed(2)}
-                  </Text>
+            <>
+              {/* ── Debt Simplifying toggle card ─────────────────────── */}
+              <View style={[
+                styles.cancellingCard,
+                {
+                  backgroundColor: cancellingEnabled ? t.primarySoft : t.card,
+                  borderColor: cancellingEnabled ? t.primaryBorder : t.border,
+                },
+              ]}>
+                <View style={styles.cancellingRow}>
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.cancellingTitleRow}>
+                      <Text style={[styles.cancellingTitle, { color: t.text }]}>Debt Simplifying</Text>
+                      <Pressable
+                        onPress={() => setShowCancellingModal(true)}
+                        hitSlop={8}
+                        accessibilityLabel="About Debt Simplifying"
+                      >
+                        <Text style={[styles.cancellingInfoIcon, { color: t.textMuted }]}>ⓘ</Text>
+                      </Pressable>
+                    </View>
+                    <Text style={[styles.cancellingSub, { color: t.textSub }]}>
+                      {cancellingEnabled
+                        ? "GotchuLatr previews the fewest payments needed for opted-in members."
+                        : "Debt Simplifying is off for this group."}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={cancellingEnabled}
+                    onValueChange={handleToggleCancelling}
+                    trackColor={{ false: t.textMuted, true: t.primary }}
+                    thumbColor="#fff"
+                    disabled={!prefLoaded}
+                  />
                 </View>
-              ))
-            )
+              </View>
+
+              {/* ── Simplified payments (only when enabled) ──────────── */}
+              {cancellingEnabled ? (
+                simplifyLoading ? (
+                  <View style={[styles.emptyBox, { backgroundColor: t.card, borderColor: t.border }]}>
+                    <Text style={[styles.emptyText, { color: t.textMuted }]}>Computing…</Text>
+                  </View>
+                ) : (
+                  <>
+                    {simplifiedPayments.length === 0 ? (
+                      <View style={[styles.emptyBox, { backgroundColor: t.card, borderColor: t.border }]}>
+                        <Text style={[styles.emptyText, { color: t.textMuted }]}>
+                          {rawGroupDebts && rawGroupDebts.length > 0
+                            ? "Everything cancels out. No payments needed."
+                            : hasExcludedDebts
+                            ? "Debt Cancelling only includes members who have opted in. Some debts may not appear yet."
+                            : "No approved debts to simplify yet."}
+                        </Text>
+                      </View>
+                    ) : (
+                      <>
+                        {/* Banner: only when some debts were excluded due to opt-out */}
+                        {hasExcludedDebts && (
+                          <View style={[styles.optInBanner, { backgroundColor: t.primarySoft, borderColor: t.primaryBorder }]}>
+                            <Text style={[styles.optInBannerText, { color: t.primary }]}>
+                              Some debts are not included because not everyone involved has opted in.
+                            </Text>
+                          </View>
+                        )}
+                        {simplifiedPayments.map((p, i) => (
+                          <View key={i} style={[styles.simplifiedRow, { backgroundColor: t.card, borderColor: t.border }]}>
+                            <Text style={[styles.simplifiedName, { color: t.red }]} numberOfLines={1}>{p.from}</Text>
+                            <Text style={[styles.simplifiedArrow, { color: t.textMuted }]}>→</Text>
+                            <Text style={[styles.simplifiedName, { color: t.green }]} numberOfLines={1}>{p.to}</Text>
+                            <Text style={[styles.simplifiedAmt, { color: t.text }]}>
+                              ${(p.amountCents / 100).toFixed(2)}
+                            </Text>
+                          </View>
+                        ))}
+                      </>
+                    )}
+                  </>
+                )
+              ) : null}
+            </>
           )}
         </View>
 
@@ -628,6 +768,12 @@ export default function GroupDashboardScreen() {
         </View>
       </ScrollView>
 
+      <DebtCancellingIntroModal
+        visible={showCancellingModal}
+        onClose={handleCancellingClose}
+        onEnable={handleCancellingEnable}
+      />
+
       <Modal visible={showSortMenu} transparent animationType="fade" onRequestClose={() => setShowSortMenu(false)}>
         <Pressable style={styles.overlay} onPress={() => setShowSortMenu(false)}>
           <Pressable style={[styles.menu, { backgroundColor: t.card }]} onPress={e => e.stopPropagation()}>
@@ -679,8 +825,14 @@ const styles = StyleSheet.create({
   actionBtnSecText: { fontSize: 15, fontWeight: "600" },
 
   section: { marginBottom: 28 },
-  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 },
+  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
   sectionTitle: { fontSize: 18, fontWeight: "700" },
+  cancellingCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 12 },
+  cancellingRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  cancellingTitleRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 3 },
+  cancellingTitle: { fontSize: 15, fontWeight: "700" },
+  cancellingInfoIcon: { fontSize: 15, fontWeight: "600" },
+  cancellingSub: { fontSize: 13, lineHeight: 18 },
   sortBtn: { width: 32, height: 32, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   sortBtnIcon: { fontSize: 14 },
   sortHint: { fontSize: 12, marginBottom: 10 },
@@ -690,6 +842,8 @@ const styles = StyleSheet.create({
   breakdownAmt: { fontSize: 15, fontWeight: "700" },
   emptyBox: { borderRadius: 14, padding: 20, alignItems: "center", borderWidth: 1 },
   emptyText: { fontSize: 14, textAlign: "center", fontStyle: "italic" },
+  optInBanner: { borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 10 },
+  optInBannerText: { fontSize: 13, lineHeight: 19 },
   txRow: { borderRadius: 14, padding: 16, marginBottom: 10, borderWidth: 1, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   txLeft: { flex: 1, marginRight: 12 },
   txPerson: { fontSize: 15, fontWeight: "600" },
@@ -708,7 +862,6 @@ const styles = StyleSheet.create({
   menuRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, marginHorizontal: 8, borderRadius: 10 },
   menuRowText: { flex: 1, fontSize: 15 },
   menuCheck: { fontSize: 15, fontWeight: "700" },
-  simplifiedSubtitle: { fontSize: 12, marginBottom: 8 },
   simplifiedRow: { borderRadius: 14, padding: 14, marginBottom: 8, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 6 },
   simplifiedName: { fontSize: 14, fontWeight: "700", flex: 1 },
   simplifiedArrow: { fontSize: 16 },

@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "@/context/AuthContext";
-import { getProfile, upsertProfile } from "@/lib/services/profileService";
+import { getProfile, upsertProfile, isUsernameAvailable } from "@/lib/services/profileService";
 
 const CACHE_KEY = "@debt_tracker/profile_v2";
 
@@ -83,6 +83,30 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
   async function updateProfile(patch: Partial<ProfileData>): Promise<string | null> {
     if (!session?.user?.id) return "Not signed in";
+
+    // ── Username validation ──────────────────────────────────────────────────
+    // Determine the final username value being saved (use existing if not in patch).
+    const newUsername = (patch.username !== undefined ? patch.username : profile.username) ?? "";
+    const newUsernameLower = newUsername.trim().toLowerCase();
+    const currentUsernameLower = profile.username.trim().toLowerCase();
+
+    if (newUsernameLower) {
+      // Same format rules as signup: 3–30 chars, letters/numbers/underscores.
+      if (!/^[a-z0-9_]{3,30}$/.test(newUsernameLower)) {
+        return "Username must be 3–30 characters: letters, numbers, and underscores only.";
+      }
+
+      // Only check remote availability when the username actually changed.
+      // Skipping the check for the current user's own username prevents a
+      // false "taken" result (check_signup_availability sees all rows).
+      if (newUsernameLower !== currentUsernameLower) {
+        const available = await isUsernameAvailable(newUsernameLower);
+        if (!available) {
+          return "That username is already taken. Please choose another.";
+        }
+      }
+    }
+    // ────────────────────────────────────────────────────────────────────────
 
     const previous = profile;
     const next = { ...profile, ...patch };

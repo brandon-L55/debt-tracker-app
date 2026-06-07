@@ -88,7 +88,7 @@ function createPaymentRequestId(debtId: string) {
 export default function IndividualDashboardScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { debts, currentUserId, markDebtsPaid, applyPartialPayment, updateDebtStatus, updateDebtDetails, cancelDebt, addPayment, markDebtManuallyPaid, undoManualPaid } = useDebts();
+  const { debts, currentUserId, applyPartialPayment, updateDebtStatus, updateDebtDetails, cancelDebt, addPayment, markDebtManuallyPaid, undoManualPaid } = useDebts();
   const { individuals } = useContacts();
   const { colors: t } = useTheme();
 
@@ -250,7 +250,14 @@ export default function IndividualDashboardScreen() {
     );
   }
 
-  const personDebts = debts.filter(d => d.person === person.name);
+  // Stable ID matching: prefer contactId (= individual.id in the creator's contact book)
+  // then linkedUserId, with a name fallback for legacy debts that have neither.
+  const personDebts = debts.filter(d => {
+    if (person.id && d.contactId) return d.contactId === person.id;
+    if (person.linkedUserId && d.linkedUserId) return d.linkedUserId === person.linkedUserId;
+    if (!d.contactId && !d.linkedUserId) return d.person === person.name;
+    return false;
+  });
   const allActiveDebts = personDebts.filter(d => d.status === "accepted" || d.status === "partial");
   const iOwe = allActiveDebts.filter(d => d.direction === "me").reduce((s, d) => s + d.remainingAmount, 0);
   const owedToMe = allActiveDebts.filter(d => d.direction === "them").reduce((s, d) => s + d.remainingAmount, 0);
@@ -549,7 +556,13 @@ export default function IndividualDashboardScreen() {
               <Pressable style={[styles.confirmCancelBtn, { borderColor: t.border }]} onPress={() => setShowPayAllModal(false)}>
                 <Text style={[styles.confirmCancelText, { color: t.textSub }]}>Cancel</Text>
               </Pressable>
-              <Pressable style={styles.confirmPayBtn} onPress={() => { setShowPayAllModal(false); markDebtsPaid(allActiveDebts.map(d => d.id)); }}>
+              <Pressable style={styles.confirmPayBtn} onPress={() => {
+                setShowPayAllModal(false);
+                // Net settlement: pay only the net amount owed (iOwe − owedToMe).
+                // applyPartialPayment distributes across direction="me" debts,
+                // smallest-first, stopping once the net total is paid.
+                applyPartialPayment({ name: person.name, contactId: person.id, linkedUserId: person.linkedUserId }, netDebt);
+              }}>
                 <LinearGradient colors={[t.from, t.to] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.confirmPayGrad}>
                   <Text style={styles.confirmPayText}>Confirm Pay All</Text>
                 </LinearGradient>
@@ -637,7 +650,7 @@ export default function IndividualDashboardScreen() {
               <Pressable
                 style={[styles.ppPayWrap, payAmount === null && { opacity: 0.4 }]}
                 disabled={payAmount === null}
-                onPress={() => { if (payAmount === null) return; applyPartialPayment(person.name, payAmount); resetAndClosePartial(); }}
+                onPress={() => { if (payAmount === null) return; applyPartialPayment({ name: person.name, contactId: person.id, linkedUserId: person.linkedUserId }, payAmount); resetAndClosePartial(); }}
               >
                 <LinearGradient colors={[t.from, t.to] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.ppPayGrad}>
                   <Text style={styles.ppPayText}>✓ Pay</Text>

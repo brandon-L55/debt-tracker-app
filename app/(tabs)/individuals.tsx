@@ -23,14 +23,25 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: "owed-to-them", label: "Highest Owed to Them" },
 ];
 
-function calcNetBalance(name: string, debts: Debt[]): number {
+/** Returns true when a debt belongs to the given individual.
+ * Uses contactId or linkedUserId when available so two contacts
+ * with identical names are never merged. Falls back to name for
+ * legacy debts that pre-date stable IDs. */
+function debtBelongsTo(d: Debt, individual: Individual): boolean {
+  if (individual.id && d.contactId) return d.contactId === individual.id;
+  if (individual.linkedUserId && d.linkedUserId) return d.linkedUserId === individual.linkedUserId;
+  if (!d.contactId && !d.linkedUserId) return d.person === individual.name;
+  return false;
+}
+
+function calcNetBalance(individual: Individual, debts: Debt[]): number {
   return debts
-    .filter(d => d.person === name && (d.status === "accepted" || d.status === "partial"))
+    .filter(d => debtBelongsTo(d, individual) && (d.status === "accepted" || d.status === "partial"))
     .reduce((s, d) => s + (d.direction === "them" ? d.remainingAmount : -d.remainingAmount), 0);
 }
 
-function latestDebtDate(name: string, debts: Debt[]): number {
-  const matches = debts.filter(d => d.person === name);
+function latestDebtDate(individual: Individual, debts: Debt[]): number {
+  const matches = debts.filter(d => debtBelongsTo(d, individual));
   if (matches.length === 0) return 0;
   return Math.max(...matches.map(d => new Date(d.createdAt).getTime()));
 }
@@ -101,9 +112,9 @@ export default function IndividualsScreen() {
       switch (sort) {
         case "az": return (a.nickname || a.name).localeCompare(b.nickname || b.name);
         case "za": return (b.nickname || b.name).localeCompare(a.nickname || a.name);
-        case "latest-debt": return latestDebtDate(b.name, debts) - latestDebtDate(a.name, debts);
-        case "owed-to-me": return calcNetBalance(b.name, debts) - calcNetBalance(a.name, debts);
-        case "owed-to-them": return calcNetBalance(a.name, debts) - calcNetBalance(b.name, debts);
+        case "latest-debt": return latestDebtDate(b, debts) - latestDebtDate(a, debts);
+        case "owed-to-me": return calcNetBalance(b, debts) - calcNetBalance(a, debts);
+        case "owed-to-them": return calcNetBalance(a, debts) - calcNetBalance(b, debts);
         default: return 0;
       }
     });
@@ -113,7 +124,7 @@ export default function IndividualsScreen() {
   const activeSortLabel = SORT_OPTIONS.find(o => o.value === sort)?.label ?? "";
 
   const renderItem = useCallback(({ item, drag, isActive }: RenderItemParams<Individual>) => {
-    const balance = calcNetBalance(item.name, debts);
+    const balance = calcNetBalance(item, debts);
     const balanceLabel = balance === 0 ? "$0.00"
       : balance > 0 ? `+$${balance.toFixed(2)}` : `-$${Math.abs(balance).toFixed(2)}`;
     const balanceColor = balance > 0 ? t.green : balance < 0 ? t.red : t.textMuted;

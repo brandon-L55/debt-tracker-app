@@ -21,6 +21,8 @@
 --   4. Grants execute to authenticated only — not anon.
 -- =============================================================
 
+drop function if exists public.search_profiles(text);
+
 create or replace function public.search_profiles(query text)
 returns table(
   id           uuid,

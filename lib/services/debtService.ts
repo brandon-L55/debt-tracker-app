@@ -858,3 +858,34 @@ export async function getGroupDebtsForSimplification(
 
   return { rawDebts, hasExcludedDebts };
 }
+
+// ─── Dashboard summary RPC ────────────────────────────────────
+
+export type DashboardSummary = {
+  youOweCents: number;
+  owedToYouCents: number;
+  totalPaidCents: number;
+  totalReceivedCents: number;
+  pendingCount: number;
+  activeDebtCount: number;
+};
+
+/**
+ * Fetches pre-aggregated dashboard totals from the server.
+ * Replaces the four client-side reduce() calls in app/(tabs)/index.tsx.
+ * Requires migration 20260607000003_dashboard_summary_rpc.sql.
+ */
+export async function getDashboardSummary(): Promise<DashboardSummary> {
+  const { data, error } = await supabase.rpc("get_dashboard_summary");
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("No data returned from get_dashboard_summary");
+
+  return {
+    youOweCents:       (data as any).you_owe_cents       ?? 0,
+    owedToYouCents:    (data as any).owed_to_you_cents   ?? 0,
+    totalPaidCents:    (data as any).total_paid_cents     ?? 0,
+    totalReceivedCents:(data as any).total_received_cents ?? 0,
+    pendingCount:      (data as any).pending_count        ?? 0,
+    activeDebtCount:   (data as any).active_debt_count    ?? 0,
+  };
+}

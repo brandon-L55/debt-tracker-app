@@ -96,8 +96,8 @@ type DebtContextType = {
   renameDebtPerson: (oldName: string, newName: string) => void;
   /** Marks the given debt IDs as paid. Used by the Pay All action on individual/group screens. */
   markDebtsPaid: (ids: string[]) => void;
-  /** Applies a partial payment amount against a person's active owed debts, oldest-first. Fully paid debts are marked paid; the last debt may be partially reduced. */
-  applyPartialPayment: (personName: string, amount: number) => void;
+  /** Applies a partial payment amount against a person's active owed debts, smallest-first. Fully paid debts are marked paid; the last debt may be partially reduced. Uses stable contactId/linkedUserId matching so same-name contacts are never conflated. */
+  applyPartialPayment: (person: { name: string; contactId?: string; linkedUserId?: string }, amount: number) => void;
   /** Marks a non-linked debt as paid without a payment record (outside-app payment). Stores pre-paid state for undo. */
   markDebtManuallyPaid: (debtId: string) => Promise<void>;
   /** Reverts a manual-paid debt back to its previous state. */
@@ -126,11 +126,32 @@ type PaymentRealtimeRow = {
   id: string;
   debt_id: string;
   payer_user_id: string | null;
+  lender_user_id: string | null;
   amount_cents: number;
 };
 
 function createClientRequestId(debtId: string) {
   return `payment:${debtId}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+}
+
+/** Checks whether a debt belongs to the given person using stable IDs first.
+ *
+ * Priority:
+ *   1. contactId match (both sides have it)
+ *   2. linkedUserId match (both sides have it)
+ *   3. name fallback (debt has no stable ID — legacy rows)
+ *
+ * A debt that has a contactId or linkedUserId but neither matches the person
+ * is explicitly rejected so two contacts with the same name are never merged.
+ */
+function matchesPerson(
+  d: Debt,
+  person: { name: string; contactId?: string; linkedUserId?: string },
+): boolean {
+  if (person.contactId && d.contactId) return d.contactId === person.contactId;
+  if (person.linkedUserId && d.linkedUserId) return d.linkedUserId === person.linkedUserId;
+  if (!d.contactId && !d.linkedUserId) return d.person === person.name;
+  return false;
 }
 
 export function DebtProvider({ children }: { children: ReactNode }) {
@@ -331,9 +352,22 @@ export function DebtProvider({ children }: { children: ReactNode }) {
             scheduleRefetch();
           },
         )
+        // Two narrow filters replace the old global payments subscription so
+        // Supabase only sends events for payments that involve the current user,
+        // instead of broadcasting every payment to every connected client.
         .on(
           "postgres_changes",
-          { event: "*", schema: "public", table: "payments" },
+          { event: "*", schema: "public", table: "payments", filter: `payer_user_id=eq.${userId}` },
+          (payload) => {
+            if (paymentTouchesLoadedDebt(payload)) {
+              notifyPaymentChange(userId, payload);
+              scheduleRefetch();
+            }
+          },
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "payments", filter: `lender_user_id=eq.${userId}` },
           (payload) => {
             if (paymentTouchesLoadedDebt(payload)) {
               notifyPaymentChange(userId, payload);
@@ -469,11 +503,11 @@ export function DebtProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  function applyPartialPayment(personName: string, amount: number) {
+  function applyPartialPayment(person: { name: string; contactId?: string; linkedUserId?: string }, amount: number) {
     // Use the live ref so we read current remainingAmount, not stale closure state.
     const activeOwed = debtsRef.current
       .filter(d =>
-        d.person === personName &&
+        matchesPerson(d, person) &&
         d.direction === "me" &&
         (d.status === "accepted" || d.status === "partial")
       )

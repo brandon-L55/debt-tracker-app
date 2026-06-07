@@ -54,8 +54,6 @@ export type ProfileSearchResult = {
   id: string;
   display_name: string | null;
   username: string | null;
-  phone: string | null;
-  email: string | null;
   avatar_url: string | null;
 };
 

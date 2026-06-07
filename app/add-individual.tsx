@@ -99,6 +99,11 @@ export default function AddIndividualScreen() {
     if (!searchResult) return;
     const displayLabel = searchResult.display_name ?? searchResult.username ?? "this person";
     const saveName = name.trim() || displayLabel;
+    // Derive the contact identifier from what the user typed, not from private
+    // profile fields (phone/email are no longer returned by search_profiles).
+    const q = query.trim();
+    const isEmail = looksLikeEmail(q);
+    const isPhone = !isEmail && looksLikePhone(q);
     setSaving(true);
     try {
       const existed = await addLinkedIndividual({
@@ -106,9 +111,9 @@ export default function AddIndividualScreen() {
         nickname: nickname.trim() || undefined,
         notes: notes.trim() || undefined,
         linkedUserId: searchResult.id,
-        username: searchResult.username ?? undefined,
-        phone: searchResult.phone ?? undefined,
-        email: searchResult.email ?? undefined,
+        username: searchResult.username ?? (!isEmail && !isPhone ? q.replace(/^@/, "") : undefined),
+        phone: isPhone ? q : undefined,
+        email: isEmail ? q.toLowerCase() : undefined,
         avatarUrl: searchResult.avatar_url ?? undefined,
         inviteStatus: null,
       });
@@ -265,7 +270,7 @@ export default function AddIndividualScreen() {
   // ─── FOUND phase ──────────────────────────────────────────────────────────
   if (phase === "found" && searchResult) {
     const displayLabel =
-      searchResult.display_name ?? searchResult.username ?? searchResult.email ?? "Unknown";
+      searchResult.display_name ?? searchResult.username ?? "Unknown";
 
     return (
       <KeyboardAvoidingView

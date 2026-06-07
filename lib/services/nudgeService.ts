@@ -63,7 +63,10 @@ export async function sendNudge({
     .select("id")
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    // Prefer the hint text (set by the rate-limit trigger) over the raw code.
+    throw new Error((error as any).hint || error.message);
+  }
 
   // Dispatch server-side push notification (fire-and-forget; never blocks the nudge)
   if (nudgeRow?.id) {
@@ -124,6 +127,18 @@ export async function markNudgeRead(nudgeId: string): Promise<void> {
   const { error } = await supabase
     .from("debt_nudges")
     .update({ read: true })
+    .eq("id", nudgeId);
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Delete (dismiss) a nudge. Only the recipient may call this.
+ * Allowed by the "debt_nudges: recipient delete" RLS policy.
+ */
+export async function deleteNudge(nudgeId: string): Promise<void> {
+  const { error } = await supabase
+    .from("debt_nudges")
+    .delete()
     .eq("id", nudgeId);
   if (error) throw new Error(error.message);
 }

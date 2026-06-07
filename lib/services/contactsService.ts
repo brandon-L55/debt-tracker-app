@@ -322,12 +322,14 @@ export async function findOrCreateContactByEmail(
       return { id: row.id, linkedUserId: row.linked_user_id };
     }
     // Existing contact has no linked_user_id — look up profile and backfill if found.
-    const { data: profileEx } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("email", normalizedEmail)
-      .maybeSingle();
-    const profileId = (profileEx as { id: string } | null)?.id ?? null;
+    // Uses the find_profile_by_email RPC (SECURITY DEFINER) instead of a direct table
+    // query so the open "profiles: email lookup" policy is no longer required.
+    const { data: profileRows } = await supabase
+      .rpc("find_profile_by_email", { p_email: normalizedEmail });
+    const profileId =
+      Array.isArray(profileRows) && profileRows.length > 0
+        ? (profileRows[0] as { id: string }).id
+        : null;
     if (profileId) {
       await supabase
         .from("contacts")
@@ -349,13 +351,15 @@ export async function findOrCreateContactByEmail(
   // 2. Optionally look up profiles by email to resolve a real user_id.
   //    If the email is not yet registered the contact is still created;
   //    linked_user_id stays null until the other party signs up.
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("email", normalizedEmail)
-    .maybeSingle();
+  //    Uses the find_profile_by_email RPC (SECURITY DEFINER) instead of a direct
+  //    table query; no open profiles SELECT policy is required.
+  const { data: profileRows2 } = await supabase
+    .rpc("find_profile_by_email", { p_email: normalizedEmail });
 
-  const linkedUserId = (profile as { id: string } | null)?.id ?? null;
+  const linkedUserId =
+    Array.isArray(profileRows2) && profileRows2.length > 0
+      ? (profileRows2[0] as { id: string }).id
+      : null;
 
   // 3. Create the contact; use displayName if provided, else the email itself.
   const name = displayName?.trim() || normalizedEmail;

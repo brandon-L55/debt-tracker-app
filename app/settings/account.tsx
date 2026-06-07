@@ -31,11 +31,11 @@ export default function AccountSettingsScreen() {
   function confirmReset() {
     Alert.alert(
       "Reset Account Data",
-      "This permanently deletes all your debts, payments, contacts, groups, friend connections, and nudges from the server.\n\nYour login credentials and profile photo are preserved.\n\nThis cannot be undone.",
+      "This will permanently delete all your debts, payments, contacts, groups, friend connections, and nudges.\n\nWhat stays:\n• Your account login remains active — you can sign back in.\n• Your display name may remain visible in shared debt records.\n• Debts that others created, where you are listed as a participant, may be retained for their records.\n\nThis cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Delete Everything",
+          text: "Reset Everything",
           style: "destructive",
           onPress: doReset,
         },
@@ -124,7 +124,7 @@ export default function AccountSettingsScreen() {
       </View>
 
       <Text style={[styles.footer, { color: t.textMuted }]}>
-        Resetting permanently deletes your data from the server. Your login credentials and profile photo are preserved.
+        Resetting deletes your debts, contacts, and groups. Your account login and display name are preserved.{"\n\n"}To permanently delete your account and login, use Request Account Deletion in Settings.
       </Text>
     </ScrollView>
   );

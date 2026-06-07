@@ -1,4 +1,4 @@
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useState } from "react";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -6,8 +6,10 @@ import { useTheme } from "@/context/ThemeContext";
 import type { ThemeMode } from "@/context/ThemeContext";
 import { useAuth } from "@/context/AuthContext";
 import { ACCENTS } from "@/constants/theme";
+import { SUPPORT_URLS } from "@/constants/support";
 import {
   User, Wallet, Shield, LogOut, ChevronRight, Sun, Moon,
+  FileText, Mail, Trash2,
 } from "lucide-react-native";
 import { GotchuLatrLogo } from "@/components/GotchuLatrLogo";
 
@@ -145,6 +147,36 @@ export default function SettingsScreen() {
               <Text style={[styles.navRowSub, { color: t.textSub }]}>{row.sub}</Text>
             </View>
             <ChevronRight size={18} color={t.textMuted} />
+          </Pressable>
+        ))}
+      </View>
+
+      {/* LEGAL & SUPPORT */}
+      <Text style={[styles.sectionLabel, { color: t.textMuted, marginTop: 18 }]}>Legal &amp; Support</Text>
+      <View style={[styles.sectionCard, { backgroundColor: t.card, borderColor: t.border }]}>
+        {[
+          { label: "Privacy Policy",           sub: "How your data is used",                    Icon: FileText, url: SUPPORT_URLS.PRIVACY_POLICY },
+          { label: "Terms of Service",          sub: "App usage terms and conditions",            Icon: FileText, url: SUPPORT_URLS.TERMS_OF_SERVICE },
+          { label: "Contact Support",           sub: "Get help or send feedback",                Icon: Mail,     url: SUPPORT_URLS.CONTACT_SUPPORT },
+          { label: "Request Account Deletion",  sub: "Permanently delete your account and login", Icon: Trash2,   route: "/settings/delete-account" as const },
+        ].map((row, i, arr) => (
+          <Pressable
+            key={row.label}
+            style={({ pressed }) => [
+              styles.navRow,
+              { borderBottomColor: t.border, borderBottomWidth: i === arr.length - 1 ? 0 : 1 },
+              pressed && { opacity: 0.85 },
+            ]}
+            onPress={() => "route" in row ? router.push(row.route as any) : Linking.openURL(row.url!)}
+          >
+            <View style={[styles.iconChip, { backgroundColor: row.label === "Request Account Deletion" ? t.redSoft : t.primarySoft }]}>
+              <row.Icon size={20} color={row.label === "Request Account Deletion" ? t.red : t.primary} strokeWidth={1.8} />
+            </View>
+            <View style={styles.navRowContent}>
+              <Text style={[styles.navRowLabel, { color: row.label === "Request Account Deletion" ? t.red : t.text }]}>{row.label}</Text>
+              <Text style={[styles.navRowSub, { color: t.textSub }]}>{row.sub}</Text>
+            </View>
+            <ChevronRight size={18} color={row.label === "Request Account Deletion" ? t.red : t.textMuted} style={{ opacity: 0.6 } as any} />
           </Pressable>
         ))}
       </View>

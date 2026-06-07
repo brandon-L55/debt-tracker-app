@@ -91,6 +91,7 @@ function AppShell() {
         <Stack.Screen name="settings/payment-apps" options={{ title: 'Payment Apps' }} />
         <Stack.Screen name="settings/contacts" options={{ title: 'Contacts Access' }} />
         <Stack.Screen name="settings/account" options={{ title: 'Account Settings' }} />
+        <Stack.Screen name="settings/delete-account" options={{ title: 'Delete Account' }} />
         <Stack.Screen name="nudges" options={{ title: 'Nudges' }} />
       </Stack>
       <StatusBar style={isDark ? 'light' : 'dark'} />

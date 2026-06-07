@@ -1,4 +1,98 @@
-# CLAUDE.md Project Instructions
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+---
+
+## Commands
+
+```bash
+npx expo start          # start dev server (scan QR for mobile, press w for web)
+npx expo start --ios    # iOS simulator
+npx expo start --android
+npx expo start --web
+npm run lint            # ESLint via expo lint
+supabase db push        # apply pending migrations to the linked Supabase project
+```
+
+Environment: create `.env` (gitignored) with:
+```
+EXPO_PUBLIC_SUPABASE_URL=...
+EXPO_PUBLIC_SUPABASE_ANON_KEY=...
+```
+
+No test runner is configured. Manual testing is the current standard (see Testing Checklist below).
+
+---
+
+## Architecture
+
+### Context provider tree (order matters)
+
+```
+ThemeProvider
+  AuthProvider
+    ProfileProvider
+      DebtProvider
+        ContactsProvider   ← inside DebtProvider so they can call renameDebtPerson
+          GroupsProvider
+```
+
+All providers live in `app/_layout.tsx`. Screens consume them via `useTheme`, `useAuth`, `useProfile`, `useDebts`, `useContacts`, `useGroups`.
+
+### Screen → Service → Supabase pattern
+
+Never call `supabase.*` directly from screens. The layers are:
+
+- `lib/services/*.ts` — raw Supabase queries; return typed data or throw
+- `context/*.tsx` — hold state, subscribe to realtime, expose mutations to screens
+- Screens call context hooks only
+
+Exceptions: auth screens call `supabase.auth.*` through `AuthContext`; `app/settings/account.tsx` calls `supabase.rpc("reset_account")` directly because the RPC is a one-shot side-effect with no state to manage.
+
+### Authentication
+
+Supabase Auth uses **email + password** only, but users register with a **phone number**. A synthetic email `ph_<digits>@gotchulatr.internal` is created under the hood so the Supabase auth system has a valid email. Users with a real email can also use it as their login identifier. Username login is resolved via the `resolve_login_identifier` RPC.
+
+Signup flow: `check_signup_availability` RPC → `supabase.auth.signUp` → profile upsert in `profiles` table.
+
+### Profile cache
+
+`ProfileContext` caches the profile in AsyncStorage at key `@debt_tracker/profile_v2`. Always patch this cache when an RPC mutates profile fields (see `account.tsx` doReset for the pattern). The cache avoids a blank-name flash on the next sign-in while the Supabase fetch completes.
+
+### Database / RLS
+
+All tables have RLS enabled. The client uses the **anon key only** — there is no service-role key on the client. RLS policies are defined in `supabase/migrations/20260521000000_initial_schema.sql` and patched by subsequent migrations.
+
+Key RLS rule: debts are visible to `creator_id`, `payer_user_id`, `borrower_user_id`, or any group member. Only the creator can mutate a debt.
+
+Migrations live in `supabase/migrations/` and are applied in filename order. Never edit a migration that has already been applied to production — add a new one.
+
+### Key RPCs (security definer, run as postgres)
+
+- `reset_account()` — clears all user data except auth identity and display_name; called from account settings
+- `resolve_login_identifier(identifier)` — maps phone/username to the auth email
+- `check_signup_availability(p_phone, p_username, p_email)` — prevents duplicate registrations
+- `mirror_contact_rpc(...)` — bidirectionally syncs contact info
+- `create_group_debts(...)` — atomically creates all debt rows for a group expense split
+
+### Realtime
+
+Supabase realtime subscriptions are active on `debts` and `contacts` channels. When adding a feature that creates or mutates these rows, check whether the realtime handler in the relevant context already covers the update before adding a manual refresh.
+
+### Routing
+
+Expo Router file-based routing. Bottom tabs are `(tabs)/index`, `(tabs)/individuals`, `(tabs)/groups`, `(tabs)/settings`. Modal/push screens are registered in `app/_layout.tsx`'s `<Stack>`. Auth screens live under `app/auth/`.
+
+### Keyboard-safe forms
+
+Use `KeyboardAwareScrollView` from `react-native-keyboard-aware-scroll-view` for any screen with text or number inputs. Do not use a plain `ScrollView` for forms.
+
+### Support / compliance URLs
+
+Placeholder URLs for privacy policy, terms, support contact, and account deletion are in `constants/support.ts` (`SUPPORT_URLS`). Update that one file when real pages exist — the settings screen imports from it.
+
+---
 
 ## Project Context
 

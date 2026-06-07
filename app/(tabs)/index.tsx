@@ -8,6 +8,8 @@ import type { Debt } from "@/context/DebtContext";
 import { GradientButton } from "@/components/GradientButton";
 import { Bell } from "lucide-react-native";
 import { getUnreadNudges } from "@/lib/services/nudgeService";
+import { getDashboardSummary } from "@/lib/services/debtService";
+import type { DashboardSummary } from "@/lib/services/debtService";
 
 type DebtSortOption =
   | "date" | "deadline-soonest" | "deadline-latest"
@@ -96,10 +98,24 @@ export default function HomeScreen() {
   const [editDeadline, setEditDeadline] = useState("");
   const [editSaving, setEditSaving] = useState(false);
   const [nudgeCount, setNudgeCount] = useState(0);
+  const [rpcSummary, setRpcSummary] = useState<DashboardSummary | null>(null);
 
   useEffect(() => {
     getUnreadNudges().then(ns => setNudgeCount(ns.length)).catch(() => {});
   }, []);
+
+  // Fetch server-side dashboard totals whenever the local debts array changes
+  // (initial load, realtime refetch, or post-payment optimistic update).
+  // The DB trigger that updates paid_cents runs synchronously on payment insert,
+  // so the RPC values are accurate even immediately after a payment lands.
+  // Falls back to local calculations below if the RPC errors or hasn't resolved yet.
+  useEffect(() => {
+    let cancelled = false;
+    getDashboardSummary()
+      .then(s => { if (!cancelled) setRpcSummary(s); })
+      .catch(e => { console.error("[dashboard summary]", e); });
+    return () => { cancelled = true; };
+  }, [debts]);
 
   function openEditDebt(debt: Debt) {
     setEditingDebt(debt);
@@ -149,16 +165,24 @@ export default function HomeScreen() {
   }
 
   const td = today();
-  // Accepted + partial debts count toward totals; use remainingAmount so paid-down
-  // balances are reflected and fully-paid debts are excluded.
-  const youOwe = debts
+
+  // Local calculations — always up-to-date with optimistic updates and serve as
+  // the fallback while the RPC is loading or if it fails.
+  const localYouOwe = debts
     .filter(d => d.direction === "me" && (d.status === "accepted" || d.status === "partial"))
     .reduce((s, d) => s + d.remainingAmount, 0);
-  const owedToYou = debts
+  const localOwedToYou = debts
     .filter(d => d.direction === "them" && (d.status === "accepted" || d.status === "partial"))
     .reduce((s, d) => s + d.remainingAmount, 0);
-  const totalPaid = debts.reduce((s, d) => s + d.totalPaidAmount, 0);
-  const totalReceived = debts.reduce((s, d) => s + d.totalReceivedAmount, 0);
+  const localTotalPaid = debts.reduce((s, d) => s + d.totalPaidAmount, 0);
+  const localTotalReceived = debts.reduce((s, d) => s + d.totalReceivedAmount, 0);
+
+  // Prefer server-confirmed values (cents → dollars); fall back to local
+  // while the RPC hasn't resolved or if it errored.
+  const youOwe     = rpcSummary != null ? rpcSummary.youOweCents / 100      : localYouOwe;
+  const owedToYou  = rpcSummary != null ? rpcSummary.owedToYouCents / 100   : localOwedToYou;
+  const totalPaid  = rpcSummary != null ? rpcSummary.totalPaidCents / 100   : localTotalPaid;
+  const totalReceived = rpcSummary != null ? rpcSummary.totalReceivedCents / 100 : localTotalReceived;
   const displayDebts = useMemo(() => sortDebts(debts, sort, td), [debts, sort, td]);
   const filteredDebts = useMemo(() => {
     switch (filterTab) {

@@ -75,6 +75,16 @@ function sortDebts(debts: Debt[], sort: DebtSortOption, td: string): Debt[] {
 
 const PAGE_SIZE = 8;
 
+/** Returns true when a group debt belongs to the given member.
+ * Matches by contactId first — name alone cannot distinguish two members
+ * with the same display name, which would merge their displayed balances. */
+function debtBelongsToGroupMember(d: Debt, m: GroupMember): boolean {
+  if (m.contactId && d.contactId) return d.contactId === m.contactId;
+  // Fallback: debt has no stable ID (e.g. the contact was deleted after creation)
+  if (!d.contactId && !d.linkedUserId) return d.person === m.name;
+  return false;
+}
+
 function statusStyle(status: string) {
   switch (status) {
     case "paid": return { backgroundColor: "#16A34A" };
@@ -306,7 +316,7 @@ export default function GroupDashboardScreen() {
   const owedToMe = groupDebts.filter(d => d.direction === "them").reduce((s, d) => s + d.amount, 0);
 
   const memberBalances = group.members.map(m => {
-    const bal = groupDebts.filter(d => d.person === m.name)
+    const bal = groupDebts.filter(d => debtBelongsToGroupMember(d, m))
       .reduce((s, d) => s + (d.direction === "them" ? d.amount : -d.amount), 0);
     return { member: m, balance: bal };
   });
@@ -454,7 +464,7 @@ export default function GroupDashboardScreen() {
                 : undefined;
 
               // Calculate this member's balance in the group
-              const memberBal = groupDebts.filter(d => d.person === m.name)
+              const memberBal = groupDebts.filter(d => debtBelongsToGroupMember(d, m))
                 .reduce((s, d) => s + (d.direction === "them" ? d.amount : -d.amount), 0);
               const memberOwesMe = memberBal > 0;
               const isNudgingMember = memberNudgeLoadingIds.has(m.id);

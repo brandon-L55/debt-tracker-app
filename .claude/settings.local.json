@@ -2,7 +2,21 @@
   "permissions": {
     "allow": [
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\bdogc\\\\OneDrive\\\\Documents\\\\GitHub\\\\debt-tracker-app\" -Directory)",
-      "Bash(Select-Object Name)"
+      "Bash(Select-Object Name)",
+      "Bash(npx supabase *)",
+      "Bash(where psql *)",
+      "Bash(where pg_isready)",
+      "PowerShell(Get-Command psql -ErrorAction SilentlyContinue; Get-ChildItem \"$env:USERPROFILE\\\\.supabase\" -ErrorAction SilentlyContinue | Select-Object Name)",
+      "PowerShell(Get-ChildItem \"$env:USERPROFILE\\\\.supabase\\\\\" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName; Get-ChildItem \"$env:APPDATA\\\\supabase\\\\\" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName)",
+      "Bash(ls -la ~/.supabase/ 2>&1 | head -20; ls -la \"c:/Users/15167/Documents/GitHub/debt-tracker-app/.supabase/\" 2>&1 | head -20)",
+      "Read(//c/Users/15167/.supabase/**)",
+      "Bash(find ~/.supabase -type f 2>/dev/null; find ~/.config/supabase -type f 2>/dev/null; cat ~/.supabase/access-token 2>/dev/null; ls ~/.supabase/)",
+      "Read(//c/Users/15167/.config/**)",
+      "Bash(find /c/Users/15167 -name \"access-token\" -o -name \"supabase-token*\" 2>/dev/null | head -10; echo \"---\"; find /c/Users/15167/AppData -name \"*.json\" -path \"*supabase*\" 2>/dev/null | head -10)",
+      "Read(//c/Users/15167/**)",
+      "Read(//c/Users/15167/AppData/**)",
+      "PowerShell($env:SUPABASE_ACCESS_TOKEN)",
+      "PowerShell($env:SUPABASE_DB_PASSWORD)"
     ]
   }
 }

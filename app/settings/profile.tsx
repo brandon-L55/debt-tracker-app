@@ -10,36 +10,43 @@ import { DoneBar } from "@/components/DoneBar";
 import { useProfile } from "@/context/ProfileContext";
 import { useAuth } from "@/context/AuthContext";
 import { uploadAvatar } from "@/lib/services/storageService";
+import { supabase } from "@/lib/supabase";
 
 const ACCESSORY_ID = "settings-profile";
 
+// Supabase creates a synthetic auth email for phone-registered users.
+// Never show this to the user — treat it as "no email set".
+const SYNTHETIC_EMAIL_SUFFIX = "@gotchulatr.internal";
+function isSyntheticEmail(email: string | null | undefined): boolean {
+  return !!email?.endsWith(SYNTHETIC_EMAIL_SUFFIX);
+}
+
 export default function ProfileSettingsScreen() {
   const { colors: t } = useTheme();
-  const { profile, updateProfile } = useProfile();
+  const { profile, isLoading, updateProfile } = useProfile();
   const { session } = useAuth();
+
   const [form, setForm] = useState({
     display_name: "",
     phone: "",
     username: "",
     avatar_url: null as string | null,
   });
-  // Holds a newly-picked local URI that hasn't been uploaded yet.
+  const [email, setEmail] = useState("");
+  const [initialEmail, setInitialEmail] = useState("");
+
   const [pendingUri, setPendingUri] = useState<string | null>(null);
-  // Tracks whether the currently-displayed image failed to load so we can fall back to initials.
   const [imageError, setImageError] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  // Derived display values — declared before the effects that reference them.
   const isBusy = uploading || saving;
-  // Only treat an avatar_url as displayable if it's an HTTPS URL.
-  // This filters out stale file:// URIs that may have been persisted by a previous app version.
   const storedUrl = form.avatar_url?.startsWith("https://") ? form.avatar_url : null;
-  // Show the local pick as an immediate preview; fall back to the stored URL.
   const displayUri = pendingUri ?? storedUrl;
   const saveLabel = uploading ? "Uploading…" : saving ? "Saving…" : saved ? "Saved ✓" : "Save Profile";
 
+  // Populate form from ProfileContext whenever context data changes.
   useEffect(() => {
     setForm({
       display_name: profile.display_name,
@@ -49,7 +56,16 @@ export default function ProfileSettingsScreen() {
     });
   }, [profile.display_name, profile.phone, profile.username, profile.avatar_url]);
 
-  // Clear any previous load-error when the URI we're trying to show changes.
+  // Populate email from Supabase Auth session.
+  // Filter out synthetic emails so phone-registered users see an empty field
+  // (prompting them to add a real email rather than editing the internal one).
+  useEffect(() => {
+    const authEmail = session?.user?.email;
+    const displayEmail = isSyntheticEmail(authEmail) ? "" : (authEmail ?? "");
+    setEmail(displayEmail);
+    setInitialEmail(displayEmail);
+  }, [session?.user?.email]);
+
   useEffect(() => {
     setImageError(false);
   }, [displayUri]);
@@ -73,42 +89,76 @@ export default function ProfileSettingsScreen() {
       return;
     }
 
-    // Start from the stored URL (must be https:// or null — never a local path).
-    let avatarUrl: string | null = storedUrl;
+    const emailTrimmed = email.trim().toLowerCase();
+    const emailChanged = emailTrimmed !== initialEmail.trim().toLowerCase();
 
-    // Upload the newly-picked image first, then save the returned public URL.
+    // Validate email format only if a value was entered or changed.
+    if (emailTrimmed && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed)) {
+      Alert.alert("Invalid Email", "Please enter a valid email address.");
+      return;
+    }
+
+    // ── Avatar upload ────────────────────────────────────────────────────────
+    let avatarUrl: string | null = storedUrl;
     if (pendingUri) {
-      console.log("[profile] uploading pendingUri:", pendingUri);
       setUploading(true);
       try {
         avatarUrl = await uploadAvatar(userId, pendingUri);
         setPendingUri(null);
-        console.log("[profile] upload succeeded, avatarUrl:", avatarUrl);
       } catch (err) {
         setUploading(false);
-        console.error("[profile] upload failed:", err);
         Alert.alert("Upload Failed", err instanceof Error ? err.message : "Could not upload photo");
         return;
       }
       setUploading(false);
     }
 
-    console.log("[profile] calling updateProfile with avatar_url:", avatarUrl);
+    // ── Profile fields ───────────────────────────────────────────────────────
     setSaving(true);
-    const patch = { ...form, avatar_url: avatarUrl };
-    const err = await updateProfile(patch);
+    const profileErr = await updateProfile({ ...form, avatar_url: avatarUrl });
+
+    // ── Email update (Supabase Auth) ─────────────────────────────────────────
+    let emailErr: string | null = null;
+    if (emailChanged && emailTrimmed) {
+      const { error } = await supabase.auth.updateUser({ email: emailTrimmed });
+      if (error) {
+        emailErr = error.message;
+      } else {
+        // Mark as committed so a subsequent save doesn't re-trigger the flow.
+        setInitialEmail(emailTrimmed);
+      }
+    }
+
     setSaving(false);
 
-    if (err) {
-      Alert.alert("Error", err);
+    if (profileErr || emailErr) {
+      const parts = [profileErr, emailErr].filter(Boolean).join("\n\n");
+      Alert.alert("Could not save", parts);
+      return;
+    }
+
+    // Keep form in sync with the uploaded avatar URL.
+    setForm(f => ({ ...f, avatar_url: avatarUrl }));
+
+    if (emailChanged && emailTrimmed) {
+      Alert.alert(
+        "Confirm Your Email",
+        `A confirmation link was sent to ${emailTrimmed}. Tap it to finish updating your email.`,
+        [{ text: "OK" }],
+      );
     } else {
-      // Explicitly sync form so displayUri updates immediately without relying on
-      // the useEffect that fires from the profile context update.
-      setForm(f => ({ ...f, avatar_url: avatarUrl }));
-      console.log("[profile] save succeeded, form.avatar_url now:", avatarUrl);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     }
+  }
+
+  // ── Loading state while ProfileContext fetches from Supabase ────────────────
+  if (isLoading) {
+    return (
+      <View style={[styles.loadingWrapper, { backgroundColor: t.bg }]}>
+        <ActivityIndicator size="large" color={t.primary} />
+      </View>
+    );
   }
 
   return (
@@ -124,22 +174,21 @@ export default function ProfileSettingsScreen() {
         keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
         showsVerticalScrollIndicator={false}
       >
-        {/* Avatar */}
+        {/* ── Avatar ─────────────────────────────────────────────────────── */}
         <View style={styles.avatarSection}>
           {displayUri && !imageError ? (
             <Image
               source={{ uri: displayUri }}
               style={styles.avatarImg}
-              onError={() => {
-                console.warn("[profile] Image failed to load, uri:", displayUri);
-                setImageError(true);
-              }}
+              onError={() => setImageError(true)}
             />
           ) : (
             <Avatar name={form.display_name || "Me"} size={88} />
           )}
           {pendingUri && (
-            <Text style={[styles.pendingLabel, { color: t.textMuted }]}>Unsaved — tap Save Profile</Text>
+            <Text style={[styles.pendingLabel, { color: t.textMuted }]}>
+              Unsaved — tap Save Profile
+            </Text>
           )}
           <Pressable
             style={[styles.changePhotoBtn, { borderColor: t.border, backgroundColor: t.card }]}
@@ -150,6 +199,7 @@ export default function ProfileSettingsScreen() {
           </Pressable>
         </View>
 
+        {/* ── Display Name ────────────────────────────────────────────────── */}
         <View style={styles.formGroup}>
           <Text style={[styles.label, { color: t.text }]}>Display Name</Text>
           <TextInput
@@ -159,9 +209,11 @@ export default function ProfileSettingsScreen() {
             inputAccessoryViewID={ACCESSORY_ID}
             value={form.display_name}
             onChangeText={v => setForm(f => ({ ...f, display_name: v }))}
+            editable={!isBusy}
           />
         </View>
 
+        {/* ── Username ────────────────────────────────────────────────────── */}
         <View style={styles.formGroup}>
           <Text style={[styles.label, { color: t.text }]}>Username</Text>
           <TextInput
@@ -173,22 +225,50 @@ export default function ProfileSettingsScreen() {
             inputAccessoryViewID={ACCESSORY_ID}
             value={form.username}
             onChangeText={v => setForm(f => ({ ...f, username: v.replace(/\s/g, "") }))}
+            editable={!isBusy}
           />
         </View>
 
+        {/* ── Phone (read-only — auth identifier) ─────────────────────────── */}
         <View style={styles.formGroup}>
           <Text style={[styles.label, { color: t.text }]}>Phone Number</Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
-            placeholder="+1 (555) 000-0000"
-            placeholderTextColor={t.textMuted}
-            keyboardType="phone-pad"
-            inputAccessoryViewID={ACCESSORY_ID}
-            value={form.phone}
-            onChangeText={v => setForm(f => ({ ...f, phone: v }))}
-          />
+          <View
+            style={[
+              styles.input,
+              styles.readonlyInput,
+              { backgroundColor: t.input, borderColor: t.border },
+            ]}
+          >
+            <Text style={[styles.readonlyText, { color: form.phone ? t.text : t.textMuted }]}>
+              {form.phone || "+1 (555) 000-0000"}
+            </Text>
+          </View>
+          <Text style={[styles.fieldNote, { color: t.textMuted }]}>
+            Phone number cannot be changed after registration.
+          </Text>
         </View>
 
+        {/* ── Email ───────────────────────────────────────────────────────── */}
+        <View style={styles.formGroup}>
+          <Text style={[styles.label, { color: t.text }]}>Email</Text>
+          <TextInput
+            style={[styles.input, { backgroundColor: t.input, borderColor: t.border, color: t.text }]}
+            placeholder="you@example.com"
+            placeholderTextColor={t.textMuted}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
+            inputAccessoryViewID={ACCESSORY_ID}
+            value={email}
+            onChangeText={setEmail}
+            editable={!isBusy}
+          />
+          <Text style={[styles.fieldNote, { color: t.textMuted }]}>
+            Changing your email will send a confirmation link to the new address.
+          </Text>
+        </View>
+
+        {/* ── Save button ─────────────────────────────────────────────────── */}
         <Pressable
           style={[
             styles.saveBtn,
@@ -210,15 +290,23 @@ export default function ProfileSettingsScreen() {
 }
 
 const styles = StyleSheet.create({
+  loadingWrapper: { flex: 1, justifyContent: "center", alignItems: "center" },
   content: { padding: 24, paddingBottom: 260, flexGrow: 1 },
+
   avatarSection: { alignItems: "center", marginBottom: 32 },
   avatarImg: { width: 88, height: 88, borderRadius: 44 },
   pendingLabel: { fontSize: 11, marginTop: 6, marginBottom: 2 },
   changePhotoBtn: { marginTop: 12, borderRadius: 10, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 8 },
   changePhotoText: { fontSize: 14, fontWeight: "600" },
+
   formGroup: { marginBottom: 20 },
   label: { fontSize: 15, fontWeight: "700", marginBottom: 8 },
   input: { borderRadius: 14, padding: 16, fontSize: 16, borderWidth: 1 },
+
+  readonlyInput: { justifyContent: "center", opacity: 0.65 },
+  readonlyText: { fontSize: 16 },
+  fieldNote: { fontSize: 12, marginTop: 6, lineHeight: 17 },
+
   saveBtn: { padding: 18, borderRadius: 16, alignItems: "center", marginTop: 8 },
   saveBtnText: { color: "#FFFFFF", fontSize: 17, fontWeight: "700" },
 });

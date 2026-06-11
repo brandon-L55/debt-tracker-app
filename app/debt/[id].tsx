@@ -49,7 +49,7 @@ function createRequestId(debtId: string) {
 }
 
 export default function DebtDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
   const router = useRouter();
   const { debts, currentUserId, addPayment, markDebtManuallyPaid, undoManualPaid, updateDebtStatus, updateDebtDetails, cancelDebt } = useDebts();
   const { individuals } = useContacts();
@@ -220,9 +220,17 @@ export default function DebtDetailScreen() {
 
   const sc = statusColors(debt.status);
 
+  const backTitleMap: Record<string, string> = {
+    dashboard: "Dashboard",
+    contacts: "Back",
+    groups: "Back",
+    debt: "Back",
+  };
+  const backTitle = backTitleMap[from ?? ""] ?? "Back";
+
   return (
     <>
-      <Stack.Screen options={{ title: `Debt with ${personName}` }} />
+      <Stack.Screen options={{ title: `Debt with ${personName}`, headerBackTitle: backTitle }} />
       <ScrollView style={{ flex: 1, backgroundColor: t.bg }} contentContainerStyle={styles.content}>
 
         {/* ── Person Card ── */}
@@ -284,7 +292,14 @@ export default function DebtDetailScreen() {
 
           {isFullyPaid && (
             <View style={[styles.paidBanner, { backgroundColor: t.greenSoft, borderColor: t.greenBorder }]}>
-              <Text style={[styles.paidBannerText, { color: t.green }]}>✓ Paid in full</Text>
+              <Text style={[styles.paidBannerText, { color: t.green }]}>
+                {debt.manuallyPaid ? "✓ Marked paid manually" : "✓ Paid in full"}
+              </Text>
+              {debt.manuallyPaid && (
+                <Text style={[styles.paidBannerSub, { color: t.textMuted }]}>
+                  Confirmed offline — no payment record
+                </Text>
+              )}
             </View>
           )}
         </View>
@@ -328,7 +343,7 @@ export default function DebtDetailScreen() {
           {group && (
             <View style={[styles.detailRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.border }]}>
               <Text style={[styles.detailKey, { color: t.textSub }]}>Group</Text>
-              <Pressable onPress={() => router.push(`/group/${debt.groupId}` as any)}>
+              <Pressable onPress={() => router.push(`/group/${debt.groupId}?from=debt` as any)}>
                 <Text style={[styles.detailVal, { color: t.primary }]}>{group.name} →</Text>
               </Pressable>
             </View>
@@ -404,7 +419,7 @@ export default function DebtDetailScreen() {
         {contact && (
           <Pressable
             style={[styles.viewPersonBtn, { backgroundColor: t.card, borderColor: t.border }]}
-            onPress={() => router.push(`/individual/${contact.id}` as any)}
+            onPress={() => router.push(`/individual/${contact.id}?from=debt` as any)}
           >
             <Text style={[styles.viewPersonText, { color: t.primary }]}>
               View all debts with {personName} →
@@ -594,6 +609,7 @@ const styles = StyleSheet.create({
   breakdownVal: { fontSize: 17, fontWeight: "700" },
   paidBanner: { borderRadius: 10, borderWidth: 1, padding: 12, alignItems: "center", marginTop: 4 },
   paidBannerText: { fontSize: 15, fontWeight: "700" },
+  paidBannerSub: { fontSize: 12, marginTop: 2 },
 
   // Details card
   detailRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 12 },

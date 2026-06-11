@@ -9,6 +9,7 @@ import { useTheme } from "@/context/ThemeContext";
 import { Avatar } from "@/components/Avatar";
 import { DoneBar } from "@/components/DoneBar";
 import { sendNudge } from "@/lib/services/nudgeService";
+import { isUserBlocked } from "@/lib/services/blockService";
 import type { Debt } from "@/context/DebtContext";
 
 type DebtSortOption =
@@ -86,7 +87,7 @@ function createPaymentRequestId(debtId: string) {
 }
 
 export default function IndividualDashboardScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
   const router = useRouter();
   const { debts, currentUserId, applyPartialPayment, updateDebtStatus, updateDebtDetails, cancelDebt, addPayment, markDebtManuallyPaid, undoManualPaid } = useDebts();
   const { individuals } = useContacts();
@@ -121,6 +122,17 @@ export default function IndividualDashboardScreen() {
   const [nudgeCooldown, setNudgeCooldown] = useState(false);
   const nudgeCooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (nudgeCooldownRef.current) clearTimeout(nudgeCooldownRef.current); }, []);
+
+  const [isBlocked, setIsBlocked] = useState(false);
+  const resolvedLinkedUserId = Array.isArray(id) ? id[0] : id;
+  // Load block status whenever the screen is focused for this contact.
+  useEffect(() => {
+    // person is resolved after the early-return guard; use individuals directly.
+    const found = individuals.find(i => i.id === resolvedLinkedUserId);
+    if (!found?.linkedUserId) return;
+    isUserBlocked(found.linkedUserId).then(setIsBlocked).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolvedLinkedUserId]);
 
   function startPaymentSubmit(debtId: string, clientRequestId: string) {
     if (paymentSubmittingRef.current.has(debtId)) return null;
@@ -269,6 +281,10 @@ export default function IndividualDashboardScreen() {
     if (!person || nudgeLoading || nudgeCooldown) return;
     const displayName = person.nickname || person.name;
 
+    if (isBlocked) {
+      Alert.alert("Blocked Contact", "You can't interact with this contact while they are blocked.");
+      return;
+    }
     if (owedToMe <= 0) {
       Alert.alert("Nothing to nudge", `${displayName} doesn't owe you anything right now.`);
       return;
@@ -317,11 +333,21 @@ export default function IndividualDashboardScreen() {
     return v > 0 && v <= netDebt ? v : null;
   })();
 
+  const backTitleMap: Record<string, string> = {
+    contacts: "Contacts",
+    groups: "Groups",
+    dashboard: "Dashboard",
+    settings: "Settings",
+    debt: "Back",
+  };
+  const backTitle = backTitleMap[from ?? "contacts"] ?? "Back";
+
   return (
     <>
       <Stack.Screen
         options={{
           title: person.nickname || person.name,
+          headerBackTitle: backTitle,
           headerRight: () => (
             <Pressable onPress={() => router.push(`/edit-individual?id=${resolvedId}` as any)} style={{ paddingHorizontal: 4 }}>
               <Text style={{ color: t.primary, fontSize: 16, fontWeight: "600" }}>Edit</Text>
@@ -333,7 +359,14 @@ export default function IndividualDashboardScreen() {
         <View style={styles.header}>
           <Avatar name={person.name} imageUri={person.imageUri} size={72} />
           <View style={{ flex: 1 }}>
-            <Text style={[styles.personName, { color: t.text }]}>{person.nickname || person.name}</Text>
+            <View style={styles.nameRow}>
+              <Text style={[styles.personName, { color: t.text }]}>{person.nickname || person.name}</Text>
+              {isBlocked && (
+                <View style={[styles.blockedBadge, { backgroundColor: t.redSoft, borderColor: t.redBorder }]}>
+                  <Text style={[styles.blockedBadgeText, { color: t.red }]}>Blocked</Text>
+                </View>
+              )}
+            </View>
             {person.nickname ? <Text style={[styles.nickname, { color: t.textSub }]}>{person.name}</Text> : null}
             {person.phoneOrUsername ? <Text style={[styles.contact, { color: t.textMuted }]}>{person.phoneOrUsername}</Text> : null}
           </View>
@@ -390,8 +423,14 @@ export default function IndividualDashboardScreen() {
         {/* Quick-action row */}
         <View style={styles.actionRow}>
           <Pressable
-            style={styles.actionBtnPrimary}
-            onPress={() => router.push(`/add-debt?contactId=${resolvedId}` as any)}
+            style={[styles.actionBtnPrimary, isBlocked && { opacity: 0.45 }]}
+            onPress={() => {
+              if (isBlocked) {
+                Alert.alert("Blocked Contact", "You can't interact with this contact while they are blocked.");
+                return;
+              }
+              router.push(`/add-debt?contactId=${resolvedId}` as any);
+            }}
           >
             <LinearGradient colors={[t.from, t.to] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionBtnGrad}>
               <Text style={styles.actionBtnPrimText}>+ Add Debt</Text>
@@ -442,7 +481,7 @@ export default function IndividualDashboardScreen() {
           const canMarkManually = canMakePayment && !isLinked;
           const canUndoPaid = debt.direction === "me" && !!debt.manuallyPaid && debt.status === "paid";
           return (
-            <Pressable key={debt.id} style={[styles.txRow, { backgroundColor: t.card, borderColor: showActions || showCreatorActions ? t.primaryBorder : t.border }]} onPress={() => router.push(`/debt/${debt.id}` as any)}>
+            <Pressable key={debt.id} style={[styles.txRow, { backgroundColor: t.card, borderColor: showActions || showCreatorActions ? t.primaryBorder : t.border }]} onPress={() => router.push(`/debt/${debt.id}?from=contacts` as any)}>
               <View style={styles.txRowContent}>
                 <View style={styles.txLeft}>
                   {debt.reason ? <Text style={[styles.txReason, { color: t.text }]}>{debt.reason}</Text>
@@ -560,7 +599,7 @@ export default function IndividualDashboardScreen() {
                 setShowPayAllModal(false);
                 // Net settlement: pay only the net amount owed (iOwe − owedToMe).
                 // applyPartialPayment distributes across direction="me" debts,
-                // smallest-first, stopping once the net total is paid.
+                // oldest-first (FIFO), stopping once the net total is paid.
                 applyPartialPayment({ name: person.name, contactId: person.id, linkedUserId: person.linkedUserId }, netDebt);
               }}>
                 <LinearGradient colors={[t.from, t.to] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.confirmPayGrad}>
@@ -837,7 +876,10 @@ const styles = StyleSheet.create({
   notFound: { flex: 1, justifyContent: "center", alignItems: "center" },
   content: { padding: 24, paddingBottom: 48 },
   header: { flexDirection: "row", alignItems: "center", gap: 16, marginBottom: 24, marginTop: 8 },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
   personName: { fontSize: 24, fontWeight: "700" },
+  blockedBadge: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 2 },
+  blockedBadgeText: { fontSize: 11, fontWeight: "700", letterSpacing: 0.4 },
   nickname: { fontSize: 14, marginTop: 2 },
   contact: { fontSize: 13, marginTop: 2 },
   cardRow: { flexDirection: "row", gap: 12, marginBottom: 16 },

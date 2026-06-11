@@ -9,7 +9,7 @@ import { ACCENTS } from "@/constants/theme";
 import { SUPPORT_URLS } from "@/constants/support";
 import {
   User, Wallet, Shield, LogOut, ChevronRight, Sun, Moon,
-  FileText, Mail, Trash2,
+  FileText, Mail, Trash2, Users,
 } from "lucide-react-native";
 import { GotchuLatrLogo } from "@/components/GotchuLatrLogo";
 
@@ -35,10 +35,11 @@ export default function SettingsScreen() {
     ]);
   }
 
-  const navRows = [
-    { label: "Profile",          sub: "Name, photo, contact info",    Icon: User,   route: "/settings/profile" },
-    { label: "Payment Apps",     sub: "Venmo, Cash App, PayPal",      Icon: Wallet, route: "/settings/payment-apps" },
-    { label: "Account Settings", sub: "Export, clear, or reset data", Icon: Shield, route: "/settings/account" },
+  const accountRows = [
+    { label: "Profile",          sub: "Name, photo, contact info",       Icon: User,   route: "/settings/profile" },
+    { label: "Contacts",         sub: "Manage contact preferences",       Icon: Users,  route: "/settings/contacts" },
+    { label: "Payment Apps",     sub: "Venmo, Cash App, PayPal",          Icon: Wallet, route: "/settings/payment-apps" },
+    { label: "Account Settings", sub: "Export, clear, or reset data",     Icon: Shield, route: "/settings/account" },
   ];
 
   const themeOptions: { id: ThemeMode; label: string; Icon: typeof Sun }[] = [
@@ -129,12 +130,12 @@ export default function SettingsScreen() {
       {/* ACCOUNT */}
       <Text style={[styles.sectionLabel, { color: t.textMuted, marginTop: 18 }]}>Account</Text>
       <View style={[styles.sectionCard, { backgroundColor: t.card, borderColor: t.border }]}>
-        {navRows.map((row, i) => (
+        {accountRows.map((row, i) => (
           <Pressable
             key={row.label}
             style={({ pressed }) => [
               styles.navRow,
-              { borderBottomColor: t.border, borderBottomWidth: i === navRows.length - 1 ? 0 : 1 },
+              { borderBottomColor: t.border, borderBottomWidth: i === accountRows.length - 1 ? 0 : 1 },
               pressed && { opacity: 0.85 },
             ]}
             onPress={() => router.push(row.route as any)}
@@ -155,9 +156,9 @@ export default function SettingsScreen() {
       <Text style={[styles.sectionLabel, { color: t.textMuted, marginTop: 18 }]}>Legal &amp; Support</Text>
       <View style={[styles.sectionCard, { backgroundColor: t.card, borderColor: t.border }]}>
         {[
-          { label: "Privacy Policy",           sub: "How your data is used",                    Icon: FileText, url: SUPPORT_URLS.PRIVACY_POLICY },
-          { label: "Terms of Service",          sub: "App usage terms and conditions",            Icon: FileText, url: SUPPORT_URLS.TERMS_OF_SERVICE },
-          { label: "Contact Support",           sub: "Get help or send feedback",                Icon: Mail,     url: SUPPORT_URLS.CONTACT_SUPPORT },
+          { label: "Privacy Policy",           sub: "How your data is used",                     Icon: FileText, url: SUPPORT_URLS.PRIVACY_POLICY },
+          { label: "Terms of Service",          sub: "App usage terms and conditions",             Icon: FileText, url: SUPPORT_URLS.TERMS_OF_SERVICE },
+          { label: "Contact Support",           sub: "Get help or send feedback",                 Icon: Mail,     url: SUPPORT_URLS.CONTACT_SUPPORT },
           { label: "Request Account Deletion",  sub: "Permanently delete your account and login", Icon: Trash2,   route: "/settings/delete-account" as const },
         ].map((row, i, arr) => (
           <Pressable

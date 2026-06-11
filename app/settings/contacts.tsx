@@ -1,58 +1,108 @@
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Stack, useRouter } from "expo-router";
 import { useTheme } from "@/context/ThemeContext";
+import { RefreshCw, UserX, Eye, Users, BellOff, ChevronRight } from "lucide-react-native";
 
-export default function ContactsScreen() {
+export default function ContactsSettingsScreen() {
+  const router = useRouter();
   const { colors: t } = useTheme();
 
-  function requestAccess() {
-    Alert.alert(
-      "Coming Soon",
-      "Contacts sync will be available in a future update. Your contacts will never be uploaded — matching happens on-device only.",
-      [{ text: "OK" }]
-    );
-  }
+  const rows = [
+    {
+      label: "Sync Contacts",
+      sub: "Find friends from your phone contacts",
+      Icon: RefreshCw,
+      route: "/settings/sync-contacts" as const,
+      placeholder: false,
+    },
+    {
+      label: "Blocked Contacts",
+      sub: "View and unblock people you've blocked",
+      Icon: UserX,
+      route: "/settings/blocked-contacts" as const,
+      placeholder: false,
+    },
+    {
+      label: "Contact Discovery",
+      sub: "Choose how people can find you",
+      Icon: Eye,
+      route: null,
+      placeholder: true,
+    },
+    {
+      label: "Friend Requests / Debt Requests",
+      sub: "Control who can send you requests",
+      Icon: Users,
+      route: null,
+      placeholder: true,
+    },
+    {
+      label: "Muted Contacts",
+      sub: "Manage people whose reminders are silenced",
+      Icon: BellOff,
+      route: null,
+      placeholder: true,
+    },
+  ];
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: t.bg }} contentContainerStyle={styles.content}>
-      <View style={[styles.statusCard, { backgroundColor: t.card, borderColor: t.border }]}>
-        <View style={[styles.statusDot, { backgroundColor: "#F59E0B" }]} />
-        <View style={styles.statusText}>
-          <Text style={[styles.statusTitle, { color: t.text }]}>Permission Not Granted</Text>
-          <Text style={[styles.statusSub, { color: t.textSub }]}>
-            Allow access so debt entries can auto-match names to your contacts.
-          </Text>
-        </View>
+    <>
+      <Stack.Screen options={{ title: "Contacts", headerBackTitle: "Settings" }} />
+      <ScrollView style={{ flex: 1, backgroundColor: t.bg }} contentContainerStyle={styles.content}>
+      <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
+        {rows.map((row, i) => {
+          const isLast = i === rows.length - 1;
+          return (
+            <Pressable
+              key={row.label}
+              style={({ pressed }) => [
+                styles.row,
+                { borderBottomColor: t.border, borderBottomWidth: isLast ? 0 : 1 },
+                row.placeholder && styles.placeholderRow,
+                pressed && !row.placeholder && { opacity: 0.85 },
+              ]}
+              onPress={() => {
+                if (row.route) router.push(row.route as any);
+              }}
+              disabled={row.placeholder}
+            >
+              <View style={[styles.iconChip, { backgroundColor: t.primarySoft }]}>
+                <row.Icon size={20} color={t.primary} strokeWidth={1.8} />
+              </View>
+              <View style={styles.rowContent}>
+                <View style={styles.labelRow}>
+                  <Text style={[styles.rowLabel, { color: t.text }]}>{row.label}</Text>
+                  {row.placeholder && (
+                    <View style={[styles.soonBadge, { backgroundColor: t.primarySoft, borderColor: t.primaryBorder }]}>
+                      <Text style={[styles.soonText, { color: t.primary }]}>Soon</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={[styles.rowSub, { color: t.textSub }]}>{row.sub}</Text>
+              </View>
+              <ChevronRight size={18} color={t.textMuted} style={{ opacity: row.placeholder ? 0.4 : 1 } as any} />
+            </Pressable>
+          );
+        })}
       </View>
-
-      <View style={[styles.infoCard, { backgroundColor: t.card, borderColor: t.border }]}>
-        <Text style={[styles.infoTitle, { color: t.text }]}>How it works</Text>
-        <Text style={[styles.infoBody, { color: t.textSub }]}>
-          When you add a debt, the app can suggest names from your contacts. Matching happens entirely on-device — no contact data is ever sent to a server.
-        </Text>
-      </View>
-
-      <Pressable style={[styles.requestBtn, { backgroundColor: t.primary }]} onPress={requestAccess}>
-        <Text style={styles.requestBtnText}>Request Contacts Access</Text>
-      </Pressable>
-
-      <Text style={[styles.note, { color: t.textMuted }]}>
-        You can revoke access at any time in your device{"'"}s Settings app.
-      </Text>
-    </ScrollView>
+      </ScrollView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   content: { padding: 24, paddingBottom: 48 },
-  statusCard: { flexDirection: "row", alignItems: "flex-start", gap: 14, borderRadius: 16, borderWidth: 1, padding: 16, marginBottom: 16 },
-  statusDot: { width: 12, height: 12, borderRadius: 6, marginTop: 3 },
-  statusText: { flex: 1 },
-  statusTitle: { fontSize: 15, fontWeight: "700" },
-  statusSub: { fontSize: 13, marginTop: 4, lineHeight: 18 },
-  infoCard: { borderRadius: 16, borderWidth: 1, padding: 16, marginBottom: 24 },
-  infoTitle: { fontSize: 15, fontWeight: "700", marginBottom: 6 },
-  infoBody: { fontSize: 13, lineHeight: 20 },
-  requestBtn: { padding: 18, borderRadius: 16, alignItems: "center" },
-  requestBtnText: { color: "#FFFFFF", fontSize: 17, fontWeight: "700" },
-  note: { fontSize: 12, textAlign: "center", marginTop: 16, lineHeight: 18 },
+  card: { borderRadius: 16, borderWidth: 1, overflow: "hidden" },
+  row: {
+    flexDirection: "row", alignItems: "center",
+    gap: 14, paddingVertical: 14, paddingHorizontal: 16,
+  },
+  placeholderRow: { opacity: 0.55 },
+  iconChip: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  rowContent: { flex: 1 },
+  labelRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  rowLabel: { fontSize: 15, fontWeight: "600" },
+  rowSub: { fontSize: 12, marginTop: 1 },
+  soonBadge: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2 },
+  soonText: { fontSize: 10, fontWeight: "700", letterSpacing: 0.3 },
 });

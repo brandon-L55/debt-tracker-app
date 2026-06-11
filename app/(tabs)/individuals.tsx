@@ -206,7 +206,7 @@ export default function IndividualsScreen() {
               },
               pressed && { opacity: 0.85 },
             ]}
-            onPress={() => router.push(`/individual/${item.id}` as any)}
+            onPress={() => router.push(`/individual/${item.id}?from=contacts` as any)}
             onLongPress={drag}
             delayLongPress={250}
             disabled={isActive}

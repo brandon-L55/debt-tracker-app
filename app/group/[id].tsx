@@ -96,7 +96,7 @@ function statusStyle(status: string) {
 }
 
 export default function GroupDashboardScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
   const router = useRouter();
   const { debts, currentUserId } = useDebts();
   const { groups } = useGroups();
@@ -312,14 +312,23 @@ export default function GroupDashboardScreen() {
     setVisibleMemberCount(PAGE_SIZE);
   }
 
-  const iOwe = groupDebts.filter(d => d.direction === "me").reduce((s, d) => s + d.amount, 0);
-  const owedToMe = groupDebts.filter(d => d.direction === "them").reduce((s, d) => s + d.amount, 0);
+  // Only accepted/partial debts count toward active balances.
+  // Use remainingAmount (not amount) so partial payments are reflected.
+  const iOwe = groupDebts
+    .filter(d => d.direction === "me" && (d.status === "accepted" || d.status === "partial"))
+    .reduce((s, d) => s + d.remainingAmount, 0);
+  const owedToMe = groupDebts
+    .filter(d => d.direction === "them" && (d.status === "accepted" || d.status === "partial"))
+    .reduce((s, d) => s + d.remainingAmount, 0);
 
   const memberBalances = group.members.map(m => {
-    const bal = groupDebts.filter(d => debtBelongsToGroupMember(d, m))
-      .reduce((s, d) => s + (d.direction === "them" ? d.amount : -d.amount), 0);
+    const bal = groupDebts
+      .filter(d => debtBelongsToGroupMember(d, m) && (d.status === "accepted" || d.status === "partial"))
+      .reduce((s, d) => s + (d.direction === "them" ? d.remainingAmount : -d.remainingAmount), 0);
     return { member: m, balance: bal };
   });
+  // Keyed by member.id for O(1) lookup in the render loop below.
+  const memberBalanceMap = new Map(memberBalances.map(mb => [mb.member.id, mb.balance]));
   const iOweMembers = memberBalances.filter(mb => mb.balance < 0);
   const oweMeMembers = memberBalances.filter(mb => mb.balance > 0);
 
@@ -426,11 +435,20 @@ export default function GroupDashboardScreen() {
 
   const activeSortLabel = DEBT_SORT_OPTIONS.find(o => o.value === sort)?.label ?? "";
 
+  const backTitleMap: Record<string, string> = {
+    groups: "Groups",
+    dashboard: "Dashboard",
+    settings: "Settings",
+    debt: "Back",
+  };
+  const backTitle = backTitleMap[from ?? "groups"] ?? "Back";
+
   return (
     <>
       <Stack.Screen
         options={{
           title: group.name,
+          headerBackTitle: backTitle,
           headerRight: () => (
             <Pressable onPress={() => router.push(`/edit-group?id=${groupId}` as any)} style={{ paddingHorizontal: 4 }}>
               <Text style={{ color: t.primary, fontSize: 16, fontWeight: "600" }}>Edit</Text>
@@ -463,9 +481,7 @@ export default function GroupDashboardScreen() {
                 ? { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: t.border }
                 : undefined;
 
-              // Calculate this member's balance in the group
-              const memberBal = groupDebts.filter(d => debtBelongsToGroupMember(d, m))
-                .reduce((s, d) => s + (d.direction === "them" ? d.amount : -d.amount), 0);
+              const memberBal = memberBalanceMap.get(m.id) ?? 0;
               const memberOwesMe = memberBal > 0;
               const isNudgingMember = memberNudgeLoadingIds.has(m.id);
               const isMemberCoolingDown = memberNudgeCooldownIds.has(m.id);
@@ -477,7 +493,7 @@ export default function GroupDashboardScreen() {
                   <Pressable
                     key={m.id}
                     style={[styles.memberListRow, borderStyle]}
-                    onPress={() => router.push(`/individual/${contact.id}` as any)}
+                    onPress={() => router.push(`/individual/${contact.id}?from=groups` as any)}
                   >
                     <Avatar name={contact.name} imageUri={contact.imageUri} size={32} />
                     <View style={{ flex: 1 }}>
@@ -754,7 +770,7 @@ export default function GroupDashboardScreen() {
           ) : displayDebts.map(debt => {
             const dl = dlInfo(debt.deadline, td);
             return (
-              <Pressable key={debt.id} style={[styles.txRow, { backgroundColor: t.card, borderColor: t.border }]} onPress={() => router.push(`/debt/${debt.id}` as any)}>
+              <Pressable key={debt.id} style={[styles.txRow, { backgroundColor: t.card, borderColor: t.border }]} onPress={() => router.push(`/debt/${debt.id}?from=groups` as any)}>
                 <View style={styles.txLeft}>
                   <Text style={[styles.txPerson, { color: t.text }]}>{debt.person}</Text>
                   {debt.reason ? <Text style={[styles.txReason, { color: t.textSub }]}>{debt.reason}</Text> : null}

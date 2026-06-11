@@ -17,9 +17,17 @@ export type Debt = {
   amount: number;
   /** Remaining balance after payments. Equals amount when no payments have been made. */
   remainingAmount: number;
-  /** Sum of payments made by the current user for this debt. */
+  /**
+   * Direction-relative view of paid_cents.
+   * Non-zero only when direction="me" (viewer is the borrower).
+   * Use `amount - remainingAmount` for a direction-neutral payment progress value.
+   */
   totalPaidAmount: number;
-  /** Sum of payments received by the current user for this debt. */
+  /**
+   * Direction-relative view of paid_cents.
+   * Non-zero only when direction="them" (viewer is the lender).
+   * Use `amount - remainingAmount` for a direction-neutral payment progress value.
+   */
   totalReceivedAmount: number;
   direction: "them" | "me";
   reason: string;
@@ -96,7 +104,7 @@ type DebtContextType = {
   renameDebtPerson: (oldName: string, newName: string) => void;
   /** Marks the given debt IDs as paid. Used by the Pay All action on individual/group screens. */
   markDebtsPaid: (ids: string[]) => void;
-  /** Applies a partial payment amount against a person's active owed debts, smallest-first. Fully paid debts are marked paid; the last debt may be partially reduced. Uses stable contactId/linkedUserId matching so same-name contacts are never conflated. */
+  /** Applies a partial payment amount against a person's active owed debts, oldest-first (FIFO). Fully paid debts are marked paid; the last debt may be partially reduced. Uses stable contactId/linkedUserId matching so same-name contacts are never conflated. */
   applyPartialPayment: (person: { name: string; contactId?: string; linkedUserId?: string }, amount: number) => void;
   /** Marks a non-linked debt as paid without a payment record (outside-app payment). Stores pre-paid state for undo. */
   markDebtManuallyPaid: (debtId: string) => Promise<void>;
@@ -470,7 +478,11 @@ export function DebtProvider({ children }: { children: ReactNode }) {
           ...d,
           remainingAmount: newRemainingCents / 100,
           status: newStatus,
-          totalPaidAmount: d.totalPaidAmount + paymentAmount,
+          // Only increment the field that matches this user's role in the debt.
+          // totalPaidAmount tracks payments *made by* the user (borrower side).
+          // totalReceivedAmount tracks payments *received by* the user (lender side).
+          totalPaidAmount:
+            d.direction === "me" ? d.totalPaidAmount + paymentAmount : d.totalPaidAmount,
           totalReceivedAmount:
             d.direction === "them" ? d.totalReceivedAmount + paymentAmount : d.totalReceivedAmount,
           paidAt: newStatus === "paid" ? new Date().toISOString() : d.paidAt,
@@ -511,7 +523,14 @@ export function DebtProvider({ children }: { children: ReactNode }) {
         d.direction === "me" &&
         (d.status === "accepted" || d.status === "partial")
       )
-      .sort((a, b) => a.remainingAmount - b.remainingAmount);  // smallest balance first
+      // FIFO: pay oldest debts first so the longest-outstanding balance is
+      // cleared before newer ones.  Fallback to original array order when
+      // createdAt values are equal (stable insertion order from the DB query).
+      .sort((a, b) => {
+        const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return ta - tb;
+      });
 
     let remaining = amount;
     for (const debt of activeOwed) {
@@ -540,7 +559,11 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       ...d,
       status: "paid" as const,
       remainingAmount: 0,
-      totalPaidAmount: d.amount,
+      // Only the borrower's totalPaidAmount reflects the full amount as paid.
+      // The lender's totalReceivedAmount stays unchanged here; manual mark-paid
+      // sets paid_cents on the debt row directly (no payment row inserted), so
+      // the lender side will resync via realtime → scheduleRefetch → rowToDebt.
+      totalPaidAmount: d.direction === "me" ? d.amount : d.totalPaidAmount,
       manuallyPaid: true,
       prePaidStatus,
       prePaidRemainingAmount,
@@ -554,7 +577,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
         ...d,
         status: prePaidStatus,
         remainingAmount: prePaidRemainingAmount,
-        totalPaidAmount: d.amount - prePaidRemainingAmount,
+        totalPaidAmount: d.direction === "me" ? d.amount - prePaidRemainingAmount : d.totalPaidAmount,
         manuallyPaid: false,
         prePaidStatus: undefined,
         prePaidRemainingAmount: undefined,
@@ -576,7 +599,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
       ...d,
       status: restoredStatus as Debt["status"],
       remainingAmount: restoredRemaining,
-      totalPaidAmount: d.amount - restoredRemaining,
+      totalPaidAmount: d.direction === "me" ? d.amount - restoredRemaining : d.totalPaidAmount,
       manuallyPaid: false,
       prePaidStatus: undefined,
       prePaidRemainingAmount: undefined,
@@ -590,7 +613,7 @@ export function DebtProvider({ children }: { children: ReactNode }) {
         ...d,
         status: "paid" as const,
         remainingAmount: 0,
-        totalPaidAmount: d.amount,
+        totalPaidAmount: d.direction === "me" ? d.amount : d.totalPaidAmount,
         manuallyPaid: true,
         prePaidStatus: restoredStatus as Debt["status"],
         prePaidRemainingAmount: restoredRemaining,

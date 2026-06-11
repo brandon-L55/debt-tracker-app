@@ -89,7 +89,9 @@ function AppShell() {
         <Stack.Screen name="edit-group" options={safeBackOptions('Edit Group')} />
         <Stack.Screen name="settings/profile" options={{ title: 'Profile' }} />
         <Stack.Screen name="settings/payment-apps" options={{ title: 'Payment Apps' }} />
-        <Stack.Screen name="settings/contacts" options={{ title: 'Contacts Access' }} />
+        <Stack.Screen name="settings/contacts" options={{ title: 'Contacts' }} />
+        <Stack.Screen name="settings/sync-contacts" options={{ title: 'Sync Contacts', headerBackTitle: 'Contacts' }} />
+        <Stack.Screen name="settings/blocked-contacts" options={{ title: 'Blocked Contacts', headerBackTitle: 'Contacts' }} />
         <Stack.Screen name="settings/account" options={{ title: 'Account Settings' }} />
         <Stack.Screen name="settings/delete-account" options={{ title: 'Delete Account' }} />
         <Stack.Screen name="nudges" options={{ title: 'Nudges' }} />

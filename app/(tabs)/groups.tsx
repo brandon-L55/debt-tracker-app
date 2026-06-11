@@ -206,7 +206,7 @@ export default function GroupsScreen() {
               },
               pressed && { opacity: 0.85 },
             ]}
-            onPress={() => router.push(`/group/${item.id}` as any)}
+            onPress={() => router.push(`/group/${item.id}?from=groups` as any)}
             onLongPress={drag}
             delayLongPress={250}
             disabled={isActive}

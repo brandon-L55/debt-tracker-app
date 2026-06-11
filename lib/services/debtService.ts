@@ -66,6 +66,21 @@ function rowToDebt(row: DebtRow, currentUserId: string): DebtWithMeta {
     direction === "me" ? row.payer_user_id : row.borrower_user_id;
 
   const paidCents = row.paid_cents ?? 0;
+  // paid_cents is a single shared counter on the debt row, incremented by the
+  // after_payment_insert trigger regardless of who is viewing the debt.
+  //
+  // totalPaidAmount and totalReceivedAmount are DIRECTION-RELATIVE views of
+  // that same counter:
+  //   • borrower (direction="me")   → totalPaidAmount   = paidCents/100, totalReceivedAmount = 0
+  //   • lender   (direction="them") → totalReceivedAmount = paidCents/100, totalPaidAmount   = 0
+  //
+  // The dashboard sums these correctly: each user's "Total Paid" is the sum of
+  // totalPaidAmount across their debts; "Total Received" is the sum of
+  // totalReceivedAmount.  Neither field double-counts.
+  //
+  // For payment-progress UI on debt cards, prefer:
+  //   paidSoFar = debt.amount - debt.remainingAmount   (direction-neutral)
+  // This is what debt/[id].tsx already uses.
   return {
     id: row.id,
     creatorId: row.creator_id,
@@ -412,16 +427,37 @@ export async function createDebt(input: CreateDebtInput): Promise<Debt> {
   }
 
   // Create a mirror contact in the recipient's address book so their
-  // Individuals tab shows the sender.  Fire-and-forget: non-critical.
+  // Individuals tab shows the sender.  Non-critical: debt is already saved.
+  // The RPC is idempotent (checks for existing contact before inserting).
   if (linkedUserId && user.email) {
-    supabase
-      .rpc("create_mirror_contact", {
+    const debtId = (data as DebtRow).id;
+    const mirrorEmail = user.email.trim().toLowerCase();
+    const callMirrorRpc = () =>
+      supabase.rpc("create_mirror_contact", {
         p_recipient_user_id: linkedUserId,
-        p_creator_email: user.email.trim().toLowerCase(),
-      })
-      .then(({ error: rpcErr }) => {
-        if (rpcErr) console.warn("[WARN] mirror contact RPC:", rpcErr.message);
+        p_creator_email: mirrorEmail,
       });
+    try {
+      const { error: rpcErr } = await callMirrorRpc();
+      if (rpcErr) throw rpcErr;
+    } catch (firstErr: unknown) {
+      // One retry after a short delay before giving up.
+      await new Promise(r => setTimeout(r, 1500));
+      try {
+        const { error: retryErr } = await callMirrorRpc();
+        if (retryErr) throw retryErr;
+      } catch (finalErr: unknown) {
+        console.warn(
+          "[mirror contact] failed after retry — recipient may not see sender in Individuals tab.",
+          {
+            debtId,
+            creatorId: user.id,
+            recipientId: linkedUserId,
+            error: (finalErr as { message?: string })?.message ?? finalErr,
+          }
+        );
+      }
+    }
   }
 
   // Create a pending friend request if these users are not already friends.
@@ -656,16 +692,21 @@ export async function createPayment(
 }
 
 /**
- * Mark a debt as paid without going through payment records (offline payment).
- * Stores the pre-paid state so the action can be undone.
- * Requires the `manually_paid`, `pre_paid_status`, and `pre_paid_remaining_cents`
- * columns to exist on the debts table (see migration below).
+ * Mark a debt as paid without inserting a payment record (offline / cash payment).
  *
- * Migration (run once in Supabase SQL editor):
- *   ALTER TABLE debts
- *     ADD COLUMN IF NOT EXISTS manually_paid boolean NOT NULL DEFAULT false,
- *     ADD COLUMN IF NOT EXISTS pre_paid_status text,
- *     ADD COLUMN IF NOT EXISTS pre_paid_remaining_cents integer;
+ * WHY NO PAYMENT ROW:
+ * The payments table is append-only — there is no DELETE RLS policy and no
+ * delete trigger.  undoManualPaid() restores paid_cents by writing directly to
+ * the debts row.  If a payment row were inserted here, undo would need to
+ * DELETE it to keep sum(payments.amount_cents) consistent with paid_cents.
+ * Since that delete is not possible under the current schema, we intentionally
+ * skip the payment row and set paid_cents directly.  The trade-off is that
+ * manually-paid debts have no payment history entry — this is by design.
+ *
+ * The manuallyPaid flag on the Debt object lets the UI display "Marked paid
+ * manually" so users know the difference.
+ *
+ * Stores the pre-paid state so the action can be undone via undoManualPaid().
  */
 export async function markDebtManuallyPaid(debtId: string): Promise<void> {
   const { data: { user }, error: userError } = await supabase.auth.getUser();

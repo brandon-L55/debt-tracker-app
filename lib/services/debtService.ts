@@ -426,39 +426,8 @@ export async function createDebt(input: CreateDebtInput): Promise<Debt> {
     throw new Error(error.message ?? "Failed to create debt");
   }
 
-  // Create a mirror contact in the recipient's address book so their
-  // Individuals tab shows the sender.  Non-critical: debt is already saved.
-  // The RPC is idempotent (checks for existing contact before inserting).
-  if (linkedUserId && user.email) {
-    const debtId = (data as DebtRow).id;
-    const mirrorEmail = user.email.trim().toLowerCase();
-    const callMirrorRpc = () =>
-      supabase.rpc("create_mirror_contact", {
-        p_recipient_user_id: linkedUserId,
-        p_creator_email: mirrorEmail,
-      });
-    try {
-      const { error: rpcErr } = await callMirrorRpc();
-      if (rpcErr) throw rpcErr;
-    } catch (firstErr: unknown) {
-      // One retry after a short delay before giving up.
-      await new Promise(r => setTimeout(r, 1500));
-      try {
-        const { error: retryErr } = await callMirrorRpc();
-        if (retryErr) throw retryErr;
-      } catch (finalErr: unknown) {
-        console.warn(
-          "[mirror contact] failed after retry — recipient may not see sender in Individuals tab.",
-          {
-            debtId,
-            creatorId: user.id,
-            recipientId: linkedUserId,
-            error: (finalErr as { message?: string })?.message ?? finalErr,
-          }
-        );
-      }
-    }
-  }
+  // Mirror contact is created by DebtContext when the recipient accepts
+  // (create_mirror_contact now requires status = accepted/partial/paid).
 
   // Create a pending friend request if these users are not already friends.
   // Fire-and-forget: non-critical — debt was already saved successfully.

@@ -271,6 +271,19 @@ export function DebtProvider({ children }: { children: ReactNode }) {
           debtId: row.id,
           event: "debt_accepted",
         });
+        // Now that the debt is accepted the mirror-contact gate passes.
+        // Fire-and-forget; idempotent if the contact already exists.
+        const recipientUserId =
+          row.payer_user_id === userId ? row.borrower_user_id : row.payer_user_id;
+        if (recipientUserId) {
+          void (async () => {
+            const { error: mirrorErr } = await supabase.rpc(
+              "create_mirror_contact",
+              { p_recipient_user_id: recipientUserId, p_creator_email: "" },
+            );
+            if (mirrorErr) console.warn("[mirror contact] on accept:", mirrorErr.message);
+          })();
+        }
         return;
       }
 
